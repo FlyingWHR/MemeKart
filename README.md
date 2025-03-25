@@ -14,7 +14,7 @@ This game is based on [Mario Kart JS](https://codespaces.new/Lunakepio/Mario-Kar
 
 ## Demo
 
-[Play MemeKart]()
+[Play MemeKart](https://github.com/FlyingWHR/MemeKart) (GitHub Repository)
 
 ## Installation
 
