@@ -4,6 +4,7 @@ import {
   PerspectiveCamera,
   Lightformer,
   Bvh,
+  PositionalAudio,
 } from "@react-three/drei";
 import { Ground } from "./Ground";
 import { PlayerController } from "./PlayerController";
@@ -37,18 +38,135 @@ import {
   useMultiplayerState,
 } from "playroomkit";
 import { PlayerDummies } from "./PlayerDummies";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, forwardRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { LUTPass, LUTCubeLoader } from "three-stdlib";
 import { useCurvedPathPoints } from "./useCurvedPath";
 import { ParisBis } from "./models/tracks/Paris-bis";
 import { Skid } from "./Skid";
 import { Dust } from "./Dust";
+import { CuboidCollider } from "@react-three/rapier";
+import { useAudioFallback } from "./useAudioFallback";
+import { useErrorTracker } from './ErrorTracker';
+import { SafePositionalAudio } from './SafePositionalAudio';
+
+// Improved audio component with ref forwarding and better stub implementation
+const SafePositionalAudio = forwardRef(({ url, ...props }, ref) => {
+  const [error, setError] = useState(false);
+  const { addError } = useErrorTracker();
+  const audioRef = useRef();
+  
+  // Forward the ref regardless of error state
+  useEffect(() => {
+    if (ref) {
+      const stubMethods = {
+        play: () => console.log(`[Audio Stub] Would play: ${url}`),
+        stop: () => console.log(`[Audio Stub] Would stop: ${url}`),
+        isPlaying: false,
+        setVolume: () => {},
+        setPlaybackRate: () => {},
+        setRefDistance: () => {},
+        setRolloffFactor: () => {},
+        setDistanceModel: () => {},
+        setMaxDistance: () => {},
+        setDirectionalCone: () => {}
+      };
+      
+      // Always give ref access to either real methods or stubs
+      ref.current = error ? stubMethods : audioRef.current || stubMethods;
+    }
+  }, [ref, url, error, audioRef]);
+  
+  useEffect(() => {
+    // Check if file exists without actually loading it
+    const checkFile = async () => {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        if (!response.ok) {
+          console.warn(`Audio file not found: ${url}`);
+          setError(true);
+          addError(`Audio file not found: ${url}`, 'audio');
+        }
+      } catch (err) {
+        console.warn(`Error checking audio file ${url}:`, err);
+        setError(true);
+        addError(`Error loading audio: ${url}`, 'audio');
+      }
+    };
+    
+    checkFile();
+  }, [url, addError]);
+  
+  // If the file doesn't exist, return null but the stub methods are already set up
+  if (error) {
+    return null;
+  }
+  
+  // Handle potential errors during loading with onError
+  return (
+    <PositionalAudio 
+      ref={(el) => {
+        audioRef.current = el;
+        if (ref) ref.current = el || {
+          play: () => console.log(`[Audio Stub] Would play: ${url}`),
+          stop: () => {},
+          isPlaying: false,
+          setVolume: () => {},
+          setPlaybackRate: () => {}
+        };
+      }}
+      url={url} 
+      {...props} 
+      onError={(e) => {
+        console.warn(`Error loading audio: ${url}`, e);
+        setError(true);
+        addError(`Error loading audio: ${url}`, 'audio');
+      }}
+    />
+  );
+});
+
+// Define checkpoints - positions around the track
+const checkpoints = [
+  // Start/Finish line - also serves as the last checkpoint
+  { position: [-20, 2, -119], size: [10, 5, 2], isFinishLine: true, index: 0 },
+  // Checkpoint 1 - after first turn
+  { position: [-80, 2, -90], size: [2, 5, 10], index: 1 },
+  // Checkpoint 2 - halfway point
+  { position: [0, 2, -20], size: [10, 5, 2], index: 2 },
+  // Checkpoint 3 - after second major turn
+  { position: [80, 2, -90], size: [2, 5, 10], index: 3 }
+];
+
+// Checkpoint visualization component (for debugging)
+const CheckpointVisual = ({ position, size, isFinishLine }) => {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={size} />
+      <meshStandardMaterial 
+        color={isFinishLine ? "#00ff00" : "#ff0000"} 
+        transparent 
+        opacity={0.3} 
+      />
+    </mesh>
+  );
+};
 
 export const Experience = () => {
   const onCollide = (event) => {};
-  const { gameStarted, bananas, shells, players, id, actions, controls } =
-    useStore();
+  const { 
+    gameStarted, 
+    bananas, 
+    shells, 
+    players, 
+    id, 
+    actions, 
+    controls, 
+    nextCheckpointIndex,
+    currentLap,
+    totalLaps,
+    isRaceFinished
+  } = useStore();
   const [networkBananas, setNetworkBananas] = useMultiplayerState(
     "bananas",
     []
@@ -59,6 +177,33 @@ export const Experience = () => {
   const [networkShells, setNetworkShells] = useMultiplayerState("shells", []);
   const [pointest, setPointest] = useState([]);
   const [currentPoint, setCurrentPoint] = useState(0);
+  
+  // Player position tracking for checkpoint detection
+  const [playerCheckpointState, setPlayerCheckpointState] = useMultiplayerState(
+    "checkpoints",
+    { nextCheckpoint: 0, currentLap: 1 }
+  );
+  
+  // Display debug info
+  const [showCheckpoints, setShowCheckpoints] = useState(false);
+  
+  const lapCompleteSound = useRef();
+  const raceFinishSound = useRef();
+  
+  useEffect(() => {
+    // Allow toggling checkpoint visibility for debugging
+    const handleKeyDown = (e) => {
+      if (e.key === 'c') {
+        setShowCheckpoints(prev => !prev);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   useEffect(() => {
     if (points) {
       //This is adjusted to Paris scale
@@ -71,22 +216,68 @@ export const Experience = () => {
     }
   }, [points]);
 
+  // Handle checkpoint collision
+  const handleCheckpointCollision = (playerObj, checkpointIndex, isFinishLine) => {
+    if (playerObj.id !== id) return; // Only process for local player
+    if (isRaceFinished) return; // Don't process checkpoints if race is already finished
+    
+    // Check if this is the next expected checkpoint
+    if (checkpointIndex === nextCheckpointIndex) {
+      // Update player's next checkpoint
+      const nextIndex = (checkpointIndex + 1) % checkpoints.length;
+      actions.setNextCheckpoint(nextIndex);
+      
+      // Update networked state
+      setPlayerCheckpointState({
+        nextCheckpoint: nextIndex,
+        currentLap: currentLap
+      });
+      
+      // If player crossed finish line and completed a full lap
+      if (isFinishLine && nextCheckpointIndex === 0) {
+        // Increment lap only if player has passed through all checkpoints
+        actions.incrementLap();
+        
+        // Play lap completion sound
+        if (lapCompleteSound.current && lapCompleteSound.current.play) {
+          try {
+            lapCompleteSound.current.play();
+          } catch (error) {
+            console.warn("Could not play lap completion sound:", error);
+          }
+        }
+        
+        // Check if race is finished
+        if (currentLap >= totalLaps - 1) { // -1 because we increment before checking
+          // Race finished!
+          actions.finishRace();
+          
+          // Play race finish sound
+          if (raceFinishSound.current && raceFinishSound.current.play) {
+            try {
+              raceFinishSound.current.play();
+            } catch (error) {
+              console.warn("Could not play race finish sound:", error);
+            }
+          }
+        }
+      }
+    }
+  };
+
   const testing = getState("bananas");
   const cam = useRef();
   const lookAtTarget = useRef();
-  // useEffect(() => {
-  //   setNetworkBananas(bananas);
-  // }, [bananas]);
-
-  // useEffect(() => {
-  //   setNetworkShells(shells);
-  // }, [shells]);
+  
   const speedFactor = 5;
   const { texture } = useLoader(LUTCubeLoader, "./cubicle-99.CUBE");
   useFrame((state, delta) => {
-    if (!gameStarted) {
+    if (gameStarted) {
+      // Increment race timer if game has started
+      actions.incrementRaceTime(delta);
+    } else {
+      // Existing camera animation logic when game hasn't started
       const camera = cam.current;
-
       if (currentPoint < pointest.length - 1) {
         camera.position.lerp(pointest[currentPoint], delta * speedFactor);
         lookAtTarget.current.position.lerp(
@@ -117,7 +308,8 @@ export const Experience = () => {
               ? PlayerControllerTouch
               : PlayerController;
 
-          return (
+          // Only show controller for active racers
+          return !isRaceFinished || player.id !== id ? (
             <ControllerComponent
               key={player.id}
               player={player}
@@ -127,7 +319,7 @@ export const Experience = () => {
               networkBananas={networkBananas}
               networkShells={networkShells}
             />
-          );
+          ) : null;
         })}
       {gameStarted &&
         players.map((player) => (
@@ -148,13 +340,49 @@ export const Experience = () => {
           />
         </>
       )}
-      {/* <Paris position={[0, 0, 0]} /> */}
 
       <ParisBis position={[0, 0, 0]} />
       <ItemBox position={[-20, 2.5, -119]} />
       <Coin position={[-30, 2, -119]} />
       <Skid />
       <Dust />
+
+      {/* Checkpoint colliders */}
+      {checkpoints.map((checkpoint, idx) => (
+        <group key={`checkpoint-${idx}`}>
+          {/* Invisible collider */}
+          <CuboidCollider
+            position={checkpoint.position}
+            args={checkpoint.size}
+            sensor
+            onIntersectionEnter={(e) => {
+              const playerBody = e.other;
+              // Check if it's a player that entered the checkpoint
+              if (playerBody.rigidBodyObject?.name === "player") {
+                handleCheckpointCollision(
+                  players.find(p => p.id === id), 
+                  checkpoint.index,
+                  checkpoint.isFinishLine
+                );
+              }
+            }}
+            userData={{ 
+              type: 'checkpoint', 
+              index: checkpoint.index,
+              isFinishLine: checkpoint.isFinishLine || false
+            }}
+          />
+          
+          {/* Visual representation (only shown when debugging) */}
+          {showCheckpoints && (
+            <CheckpointVisual 
+              position={checkpoint.position}
+              size={checkpoint.size}
+              isFinishLine={checkpoint.isFinishLine}
+            />
+          )}
+        </group>
+      ))}
 
       <Ground position={[0, 0, 0]} />
       <Environment resolution={256} preset="lobby" />
@@ -197,7 +425,6 @@ export const Experience = () => {
         disableDepthPass
       >
         <SMAA />
-        {/* <N8AO distanceFalloff={1} aoRadius={1} intensity={3} /> */}
         <Bloom
           luminanceThreshold={0}
           mipmapBlur
@@ -205,10 +432,23 @@ export const Experience = () => {
           intensity={0.5}
         />
         <TiltShift2 />
-        {/* <ChromaticAberration offset={[0.0006, 0.0006]} /> */}
         <HueSaturation saturation={0.05} />
-        {/* <Vignette eskil={false} offset={0.1} darkness={0.4} /> */}
       </EffectComposer>
+
+      {/* Sound effects */}
+      <SafePositionalAudio
+        ref={lapCompleteSound}
+        url="./sounds/lap_complete.mp3" 
+        distance={5}
+        loop={false}
+      />
+      
+      <SafePositionalAudio
+        ref={raceFinishSound}
+        url="./sounds/race_finish.mp3"
+        distance={5}
+        loop={false}
+      />
     </>
   );
 };
