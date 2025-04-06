@@ -1,0 +1,303 @@
+/* Countdown Overlay */
+.countdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  background-color: transparent;
+  pointer-events: none;
+}
+
+/* Traffic light container with spring-like entrance */
+.traffic-light-container {
+  overflow: visible;
+  margin-bottom: 20px; /* Reduced from 30px to bring countdown closer */
+  animation: springInFromTop 1.2s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards; /* Spring effect with moderate speed */
+}
+
+/* When GO appears, move traffic light up - RESTORING THE WORKING ANIMATION */
+.countdown-overlay.go-active .traffic-light-container {
+  animation: slideOutToTop 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+/* When fading out, slide traffic light up quickly */
+.countdown-overlay.fade-out .traffic-light-container {
+  animation: slideOutToTop 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards !important;
+}
+
+/* Traffic light styling - CHANGED TO HORIZONTAL */
+.traffic-light {
+  display: flex;
+  flex-direction: row; /* Changed from column to row for horizontal layout */
+  background-color: rgba(40, 40, 40, 0.9);
+  border-radius: 12px;
+  padding: 15px;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+  /* Increased width for horizontal layout */
+  width: auto;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Spring-like entrance from top */
+@keyframes springInFromTop {
+  0% {
+    transform: translateY(-150px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(20px); /* Overshoot for spring effect */
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-10px); /* Bounce back */
+    opacity: 1;
+  }
+  90% {
+    transform: translateY(5px); /* Second smaller overshoot */
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0); /* Final resting position */
+    opacity: 1;
+  }
+}
+
+/* Fast exit to top */
+@keyframes slideOutToTop {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-200px);
+    opacity: 0;
+  }
+}
+
+/* Light styling */
+.light {
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  margin: 12px;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  background-color: rgba(80, 80, 80, 0.6);
+  transition: all 0.3s ease;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.light.active.red {
+  background-color: #ff0000;
+  box-shadow: 0 0 25px #ff0000, inset 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.light.active.yellow {
+  background-color: #ffcc00;
+  box-shadow: 0 0 25px #ffcc00, inset 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.light.active.green {
+  background-color: #00ff00;
+  box-shadow: 0 0 25px #00ff00, inset 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Countdown number with spring effect - LARGER WITH NEON OUTLINE */
+.countdown-number {
+  font-size: 10rem; /* Increased from 6rem to make numbers much larger */
+  font-weight: 900; /* Bolder font weight */
+  color: white;
+  text-shadow: 
+    0 0 20px rgba(0, 217, 255, 0.9), 
+    0 0 40px rgba(0, 217, 255, 0.7),
+    0 0 60px rgba(0, 217, 255, 0.5);
+  -webkit-text-stroke: 3px #00d9ff; /* Neon outline */
+  animation: springInFromBottom 1.2s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards;
+  margin-top: 10px; /* Reduced from 30px to bring countdown closer to traffic light */
+}
+
+/* GO! text */
+.countdown-number.go-text {
+  color: white;
+  text-shadow: 
+    0 0 20px #00bfff, 
+    0 0 40px #00bfff, 
+    0 0 60px rgba(0, 191, 255, 0.8);
+  font-size: 12rem; /* Increased from 8rem */
+  letter-spacing: 5px;
+  font-weight: 900;
+  font-style: italic;
+  animation: goAnimation 0.7s ease-out forwards;
+  -webkit-text-stroke: 4px #00e5ff; /* Thicker neon outline */
+}
+
+/* When GO appears, make GO text disappear together with traffic light */
+.countdown-overlay.go-active .countdown-number.go-text {
+  animation: slideOutToTop 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+/* Regular numbers fade out downward */
+.countdown-overlay.fade-out .countdown-number:not(.go-text) {
+  animation: slideOutToBottom 0.4s ease-out forwards !important;
+}
+
+/* Spring-like entrance from bottom */
+@keyframes springInFromBottom {
+  0% {
+    transform: translateY(150px) scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-20px) scale(1.05); /* Overshoot for spring effect */
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(10px) scale(0.98); /* Bounce back */
+    opacity: 1;
+  }
+  90% {
+    transform: translateY(-5px) scale(1.01); /* Second smaller overshoot */
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1); /* Final resting position */
+    opacity: 1;
+  }
+}
+
+/* Fast exit to bottom */
+@keyframes slideOutToBottom {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(200px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes goAnimation {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* RACE STATS DISPLAY STYLING - MOVED TO TOP RIGHT */
+.race-stats {
+  position: fixed;
+  top: 20px;
+  right: 20px; /* Changed from left to right */
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* Changed from flex-start to flex-end */
+  color: #fff;
+  font-family: var(--font-primary, sans-serif);
+  border: 2px solid rgba(0, 217, 255, 0.4);
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  z-index: 100;
+  transform: skew(-10deg); /* Added racing skew effect */
+  min-width: 150px; /* Ensure minimum width */
+}
+
+.lap-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  justify-content: flex-end; /* Align to the right */
+  width: 100%;
+}
+
+.lap-text {
+  font-size: 1.2rem;
+  font-weight: 900;
+  margin-right: 10px;
+  color: white;
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.9);
+  text-transform: uppercase; /* Racing style text */
+  letter-spacing: 1px;
+  -webkit-text-stroke: 1px #00d9ff; /* Neon teal outline */
+}
+
+.lap-value {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 0 15px rgba(0, 217, 255, 0.9);
+  letter-spacing: 1px;
+  -webkit-text-stroke: 1px #00d9ff; /* Neon teal outline */
+}
+
+.timer-value {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 0 15px rgba(0, 217, 255, 0.9);
+  letter-spacing: 1px;
+  -webkit-text-stroke: 1px #00d9ff; /* Neon teal outline */
+  width: 100%;
+  text-align: right;
+}
+
+/* SPEED DISPLAY STYLING - KEEP AT BOTTOM RIGHT */
+.speed-display {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  padding: 15px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  font-family: var(--font-primary, sans-serif);
+  border: 2px solid rgba(0, 217, 255, 0.4);
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  z-index: 100;
+  transform: skew(-10deg); /* Added racing skew effect */
+  min-width: 120px;
+}
+
+.speed-value {
+  font-size: 3rem;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 0 15px rgba(0, 217, 255, 0.9);
+  -webkit-text-stroke: 2px #00d9ff; /* Neon teal outline */
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.speed-unit {
+  font-size: 1rem;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  -webkit-text-stroke: 1px #00d9ff; /* Neon teal outline */
+  margin-top: 5px;
+} 
