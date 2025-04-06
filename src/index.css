@@ -18,46 +18,74 @@
   --font-size-sm: 1rem;       /* 16px - Secondary text */
   --font-size-xs: 0.875rem;   /* 14px - Labels, small text */
   
-  /* Colors - ADJUSTED FOR LIGHTER FEEL */
-  --color-primary: #00d9ff;   /* Primary accent color - brighter cyan */
-  --color-secondary: #00c070; /* Secondary accent - brighter green */
-  --color-tertiary: #ffdd33;  /* Highlight color - brighter gold */
+  /* Colors - RACING THEME */
+  --color-primary: #00d9ff;   /* Primary accent color - neon cyan */
+  --color-secondary: #00c0ff; /* Secondary accent - bright blue */
+  --color-tertiary: #ffdd33;  /* Highlight color - racing gold */
+  
+  /* Expanded racing UI colors */
+  --color-speed: #00d9ff;     /* Speed display - cyan */
+  --color-lap: #ffdd33;       /* Lap counter - gold */
+  --color-timer: #00ff7f;     /* Timer - neon green */
+  --color-select: #ffdd33;    /* Select button - gold */
+  --color-back: #00c0ff;      /* Back button - blue */
+  --color-warning: #ff5500;   /* Warning/caution - orange */
+  --color-danger: #ff0033;    /* Danger/stop - red */
+  --color-go: #00ff44;        /* Go/success - green */
   
   --color-text-primary: #ffffff;           /* Main text color */
   --color-text-secondary: rgba(255, 255, 255, 0.9); /* Increased opacity for better readability */
   --color-text-tertiary: rgba(255, 255, 255, 0.7);  /* Increased opacity for better readability */
   
-  /* Lighter backgrounds */
-  --color-bg-primary: rgba(0, 0, 0, 0.6);   /* More transparent primary background */
-  --color-bg-secondary: rgba(0, 0, 0, 0.4); /* More transparent secondary background */
-  --color-bg-tertiary: rgba(0, 0, 0, 0.2);  /* More transparent tertiary background */
+  /* Racing UI backgrounds */
+  --color-bg-primary: rgba(0, 0, 0, 0.6);   /* Primary UI background */
+  --color-bg-secondary: rgba(0, 0, 0, 0.4); /* Secondary UI background */
+  --color-bg-tertiary: rgba(0, 0, 0, 0.2);  /* Tertiary UI background */
+  --color-bg-racing-display: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)); /* Standard racing UI display background */
   
-  --color-border-primary: rgba(255, 255, 255, 0.4);   /* More visible border */
-  --color-border-secondary: rgba(255, 255, 255, 0.2); /* More visible secondary border */
+  --color-border-primary: rgba(255, 255, 255, 0.4);   /* Standard UI border */
+  --color-border-secondary: rgba(255, 255, 255, 0.2); /* Secondary UI border */
   
-  /* Effects - ENHANCED */
+  /* Racing UI neon effects */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
   --shadow-md: 0 5px 20px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.25);
   --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.3);
   
-  --glow-primary: 0 0 25px rgba(0, 217, 255, 0.5);
-  --glow-secondary: 0 0 20px rgba(255, 255, 255, 0.4);
-  --glow-tertiary: 0 0 25px rgba(255, 221, 51, 0.5);
+  --glow-primary: 0 0 15px var(--color-primary), 0 0 25px rgba(0, 217, 255, 0.5);
+  --glow-secondary: 0 0 15px var(--color-secondary), 0 0 25px rgba(0, 192, 255, 0.5);
+  --glow-tertiary: 0 0 15px var(--color-tertiary), 0 0 25px rgba(255, 221, 51, 0.5);
+  --glow-speed: 0 0 15px var(--color-speed), 0 0 25px rgba(0, 217, 255, 0.5);
+  --glow-lap: 0 0 15px var(--color-lap), 0 0 25px rgba(255, 221, 51, 0.5);
+  --glow-timer: 0 0 15px var(--color-timer), 0 0 25px rgba(0, 255, 127, 0.5);
+  --glow-go: 0 0 15px var(--color-go), 0 0 25px rgba(0, 255, 68, 0.5);
+  --glow-warning: 0 0 15px var(--color-warning), 0 0 25px rgba(255, 85, 0, 0.5);
+  --glow-danger: 0 0 15px var(--color-danger), 0 0 25px rgba(255, 0, 51, 0.5);
   
-  /* Spacing - kept the same */
+  /* Racing UI text shadows */
+  --text-shadow-sm: 0 0 5px rgba(255, 255, 255, 0.7);
+  --text-shadow-md: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5);
+  --text-shadow-lg: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 30px rgba(255, 255, 255, 0.7);
+  --text-shadow-primary: 0 0 10px rgba(0, 217, 255, 0.8), 0 0 20px rgba(0, 217, 255, 0.5);
+  --text-shadow-secondary: 0 0 10px rgba(0, 192, 255, 0.8), 0 0 20px rgba(0, 192, 255, 0.5);
+  --text-shadow-tertiary: 0 0 10px rgba(255, 221, 51, 0.8), 0 0 20px rgba(255, 221, 51, 0.5);
+  
+  /* Spacing */
   --space-xs: 5px;
   --space-sm: 10px;
   --space-md: 20px;
   --space-lg: 30px;
   --space-xl: 40px;
   
-  /* Border Radius - slightly increased */
+  /* Border Radius */
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-xl: 36px;
   --radius-full: 50%;
+  
+  /* Racing UI skew angle */
+  --skew-angle: -5deg;
 }
 
 #root {
@@ -228,26 +256,28 @@ body::-webkit-scrollbar {
   z-index: 2;
   font-family: "Hanken Grotesk";
   overflow-y: auto;
+  padding: 15px 0;
 }
 
 .home .logo {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .home .logo img {
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   height: auto;
-  margin: 20px 0;
+  margin: 10px 0;
+  transform: scale(1, 0.9);
 }
 
 .home .start {
   opacity: 0;
   display: flex;
-  margin: 20px 0 40px 0;
+  margin: 10px 0 20px 0;
   justify-content: center;
   align-items: center;
   font-weight: var(--font-weight-black);
@@ -258,7 +288,7 @@ body::-webkit-scrollbar {
       rgba(54, 54, 54, 0),
       rgb(54, 54, 54),
       rgba(54, 54, 54, 0));
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
   animation: blinking 2s infinite;
   transition: all 0.2s ease 0s;
   cursor: pointer;
@@ -582,26 +612,24 @@ body::-webkit-scrollbar {
   font-family: var(--font-primary);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-secondary);
-  margin: 0;
+  margin: -5px auto 0 auto;
   background: linear-gradient(
     to right,
     rgba(54, 54, 54, 0),
     rgb(54, 54, 54),
     rgba(54, 54, 54, 0)
   );
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
   text-shadow: 0 0 10px rgba(0, 0, 0, 1);
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
   max-width: 400px;
-  margin-left: auto;
-  margin-right: auto;
   transition: opacity 0.5s ease;
 }
 
 .controls-start h2 {
-  font-size: var(--font-size-lg);
-  margin-bottom: var(--space-md);
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-sm);
   text-align: center;
   color: var(--color-text-primary);
 }
@@ -609,57 +637,61 @@ body::-webkit-scrollbar {
 .controls-start ul {
   display: grid;
   grid-template-columns: auto auto;
-  gap: 15px;
-  width: 400px;
+  gap: 6px;
+  width: 380px;
   list-style: none;
   padding: 0;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .controls-start li {
   display: grid;
-  grid-template-columns: 85px 1fr;
+  grid-template-columns: 80px 1fr;
   align-items: center;
   white-space: nowrap;
   justify-content: start;
-  gap: 10px;
-  font-size: 14px;
+  gap: 8px;
+  font-size: 13px;
 }
 
 @media screen and (max-width: 768px) {
   .home .logo img {
-    max-width: 300px;
-    margin: 10px 0;
+    max-width: 280px;
+    margin: 5px 0;
+    transform: scale(1, 0.85);
   }
 
   .home .start {
-    font-size: 20px;
-    margin: 10px 0;
+    font-size: 18px;
+    margin: 5px 0;
   }
 
   .controls-start {
-    padding: 10px;
-    max-width: 95%;
+    padding: 8px;
+    max-width: 90%;
   }
 
   .controls-start h2 {
-    font-size: 18px;
-    margin-bottom: 10px;
+    font-size: 16px;
+    margin-bottom: 5px;
   }
 
   .controls-start ul {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     width: 100%;
-    gap: 8px;
+    gap: 4px;
   }
 
   .controls-start li {
-    font-size: 12px;
-    grid-template-columns: 70px 1fr;
+    font-size: 11px;
+    grid-template-columns: 65px 1fr;
   }
 
   .controls-start .key {
-    font-size: 12px;
-    padding: 2px 6px;
+    font-size: 11px;
+    padding: 1px 5px;
+    height: 18px;
   }
 }
 
@@ -842,9 +874,10 @@ body::-webkit-scrollbar {
   box-shadow: var(--shadow-md);
   letter-spacing: 0.5px;
   line-height: 1.3;
+  outline: none; /* Remove default focus ring */
 }
 
-.character-card:hover {
+.character-card:hover, .character-card:focus {
   transform: scale(1.05);
   border-color: var(--color-primary);
   box-shadow: var(--glow-primary);
@@ -854,6 +887,8 @@ body::-webkit-scrollbar {
   background: linear-gradient(to bottom, rgba(30, 30, 40, 0.8), rgba(50, 50, 70, 0.8));
   border-color: var(--color-tertiary);
   box-shadow: 0 0 30px var(--color-tertiary), var(--shadow-lg);
+  transform: scale(1.05);
+  z-index: 10; /* Ensure selected card appears above others */
 }
 
 .character-image {
@@ -898,28 +933,31 @@ body::-webkit-scrollbar {
 .stat-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 90%;
+  justify-content: flex-start;
+  width: 95%;
   position: relative;
   margin-bottom: 2px;
 }
 
 .stat-label {
   font-size: 11px;
-  min-width: 45px;
-  width: 45px;
+  min-width: 52px;
+  width: 52px;
   text-align: right;
   padding-right: 8px;
   font-weight: var(--font-weight-bold);
   color: var(--color-primary);
   white-space: nowrap;
   letter-spacing: 0.5px;
+  line-height: 1;
 }
 
 .stat-bars {
   display: flex;
   gap: 2px;
   justify-content: flex-start;
+  align-items: center;
+  flex: 1;
 }
 
 .stat-bar {
@@ -937,36 +975,76 @@ body::-webkit-scrollbar {
   border: none; /* Remove border on filled bars */
 }
 
+/* Navigation buttons - Simplified Color Scheme */
+.select-btn, .back-btn {
+  padding: 12px 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-black);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  margin: 0 10px;
+  outline: none; /* Remove default focus outline */
+  position: relative;
+  overflow: hidden;
+  transform: skew(var(--skew-angle));
+  background: var(--color-bg-racing-display);
+  box-shadow: var(--shadow-md);
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  color: white;
+  text-shadow: var(--text-shadow-sm);
+}
+
+.select-btn:hover, .select-btn:focus,
+.back-btn:hover, .back-btn:focus {
+  transform: translateY(-3px) skew(var(--skew-angle));
+  border-color: rgba(0, 217, 255, 0.7);
+  text-shadow: var(--text-shadow-primary);
+  color: white;
+  box-shadow: var(--glow-primary);
+}
+
+.select-btn {
+  background: linear-gradient(to bottom, rgba(0, 217, 255, 0.1), rgba(0, 217, 255, 0.2));
+  border-color: rgba(0, 217, 255, 0.5);
+  box-shadow: 0 0 15px rgba(0, 217, 255, 0.3);
+  text-shadow: var(--text-shadow-primary);
+  color: white;
+  font-style: italic;
+}
+
+.select-btn:hover, .select-btn:focus {
+  background: linear-gradient(to bottom, rgba(0, 217, 255, 0.2), rgba(0, 217, 255, 0.3));
+  box-shadow: var(--glow-primary);
+  text-shadow: var(--text-shadow-primary);
+  border-color: rgba(0, 217, 255, 0.8);
+}
+
+.back-btn {
+  background: linear-gradient(to bottom, rgba(0, 217, 255, 0.05), rgba(0, 217, 255, 0.15));
+  border-color: rgba(0, 217, 255, 0.4);
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.2);
+  text-shadow: var(--text-shadow-primary);
+  color: white;
+  font-style: italic;
+}
+
+.back-btn:hover, .back-btn:focus {
+  background: linear-gradient(to bottom, rgba(0, 217, 255, 0.15), rgba(0, 217, 255, 0.25));
+  box-shadow: var(--glow-primary);
+  text-shadow: var(--text-shadow-primary);
+  border-color: rgba(0, 217, 255, 0.7);
+}
+
+/* Updated character selection nav to better position buttons */
 .character-select-nav {
   display: flex;
   gap: var(--space-lg);
   margin-top: var(--space-lg);
-}
-
-.select-btn, .back-btn {
-  padding: 14px 35px;
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-primary);
-  border: 2px solid var(--color-border-primary);
-  border-radius: var(--radius-xl);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  box-shadow: var(--shadow-lg);
-  text-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
-}
-
-.select-btn {
-  background: linear-gradient(to bottom, var(--color-secondary), rgba(0, 170, 100, 0.8));
-}
-
-.select-btn:hover {
-  background: linear-gradient(to bottom, rgba(0, 210, 120, 1), rgba(0, 180, 110, 0.9));
-  transform: scale(1.08);
-  box-shadow: var(--glow-primary);
+  justify-content: center;
 }
 
 /* Add glow effect to the model container when selected */
@@ -1002,774 +1080,6 @@ body::-webkit-scrollbar {
 }
 
 /* Media queries for responsive layout */
-@media (max-width: 768px) {
-  .character-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .character-card {
-    width: 150px;
-    height: 220px;
-    padding: 10px;
-  }
-  
-  .character-preview {
-    min-height: 300px;
-    margin-bottom: 20px;
-  }
-  
-  .character-preview-model {
-    height: 240px; /* Changed from 320px to 240px for 4:3 ratio */
-    width: 320px; /* Make it square */
-  }
-  
-  .character-selection h2 {
-    font-size: 2rem;
-  }
-  
-  .select-btn, .back-btn {
-    padding: 10px 25px;
-    font-size: 18px;
-  }
-  
-  .character-selection-content {
-    gap: 15px;
-  }
-}
-
-@media (max-width: 480px) {
-  .character-grid {
-    grid-template-columns: repeat(1, 1fr);
-  }
-  
-  .character-card {
-    width: 140px;
-    height: 190px;
-    padding: 8px 6px;
-  }
-  
-  .character-preview-model {
-    height: 200px;
-  }
-  
-  .stat-label {
-    min-width: 40px;
-    width: 40px;
-    font-size: 9px;
-    padding-right: 5px;
-  }
-  
-  .stat-bar {
-    width: 7px;
-    height: 5px;
-  }
-}
-
-.controls-start .key-container {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 8px;
-}
-
-.controls-start .key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 8px;
-  height: 24px;
-  margin: 0 4px;
-  font-size: 0.9em;
-  white-space: nowrap;
-  vertical-align: middle;
-  line-height: 1;
-}
-
-.controls-start .key:last-of-type {
-  margin-right: 0;
-}
-
-/* Speed display styles */
-.speed-display {
-  position: absolute;
-  bottom: 30px;
-  right: 30px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5));
-  border-radius: 10px;
-  padding: 12px 18px;
-  color: white;
-  font-family: "Hanken Grotesk", sans-serif;
-  text-align: center;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 100;
-  transform: skew(-5deg);
-  min-width: 100px;
-}
-
-.speed-value {
-  font-size: 38px;
-  font-weight: 900;
-  letter-spacing: -1px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7), 0 0 20px rgba(0, 200, 255, 0.5);
-  line-height: 1;
-  color: #ffffff;
-  font-style: italic;
-}
-
-.speed-unit {
-  font-size: 14px;
-  font-weight: bold;
-  opacity: 0.9;
-  margin-top: 2px;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px rgba(0, 200, 255, 0.8);
-}
-
-/* Race Stats (Combined Lap and Timer) */
-.race-stats {
-  position: absolute;
-  top: 30px;
-  right: 30px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5));
-  border-radius: 10px;
-  padding: 12px 18px;
-  color: white;
-  font-family: "Hanken Grotesk", sans-serif;
-  text-align: center;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 100;
-  transform: skew(-5deg);
-  min-width: 160px;
-}
-
-.race-stats .lap-container {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-
-.race-stats .lap-text {
-  font-size: 16px;
-  font-weight: bold;
-  opacity: 0.8;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px rgba(0, 200, 255, 0.8);
-}
-
-.race-stats .lap-value {
-  font-size: 36px;
-  font-weight: 900;
-  letter-spacing: -1px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7), 0 0 20px rgba(0, 200, 255, 0.5);
-  line-height: 1;
-  color: #ffffff;
-  font-style: italic;
-}
-
-.race-stats .timer-value {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6), 0 0 15px rgba(0, 200, 255, 0.4);
-  color: #ffffff;
-  margin-top: 5px;
-}
-
-@media (max-width: 768px) {
-  .speed-display {
-    bottom: 20px;
-    right: 20px;
-    padding: 8px 12px;
-    min-width: 80px;
-  }
-  
-  .speed-value {
-    font-size: 30px;
-  }
-  
-  .speed-unit {
-    font-size: 12px;
-  }
-  
-  .race-stats {
-    top: 20px;
-    right: 20px;
-    padding: 8px 12px;
-    min-width: 140px;
-  }
-  
-  .race-stats .lap-text {
-    font-size: 14px;
-  }
-  
-  .race-stats .lap-value {
-    font-size: 30px;
-  }
-  
-  .race-stats .timer-value {
-    font-size: 22px;
-    margin-top: 3px;
-  }
-}
-
-/* Custom Race Info Styles - Top Right Corner */
-.lap-counter, .timer {
-  position: absolute;
-  right: 30px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5));
-  border-radius: 10px;
-  padding: 10px 15px;
-  color: white;
-  font-family: "Hanken Grotesk", sans-serif;
-  text-align: center;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 100;
-  transform: skew(-5deg);
-  min-width: 120px;
-}
-
-.lap-counter {
-  top: 30px;
-}
-
-.timer {
-  top: 100px;
-}
-
-.lap-text, .timer-label {
-  font-size: 14px;
-  font-weight: bold;
-  opacity: 0.8;
-  margin-bottom: 3px;
-  letter-spacing: 1px;
-}
-
-.lap-value, .timer-value {
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.5px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7), 0 0 20px rgba(0, 200, 255, 0.5);
-  color: #ffffff;
-}
-
-@media (max-width: 768px) {
-  .speed-display {
-    bottom: 20px;
-    right: 20px;
-    padding: 8px 12px;
-    min-width: 80px;
-  }
-  
-  .speed-value {
-    font-size: 30px;
-  }
-  
-  .speed-unit {
-    font-size: 12px;
-  }
-  
-  .lap-counter, .timer {
-    right: 20px;
-    padding: 8px 12px;
-    min-width: 100px;
-  }
-  
-  .lap-counter {
-    top: 20px;
-  }
-  
-  .timer {
-    top: 80px;
-  }
-  
-  .lap-text, .timer-label {
-    font-size: 12px;
-  }
-  
-  .lap-value, .timer-value {
-    font-size: 18px;
-  }
-}
-
-.speed-debug {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 2px;
-  font-style: normal;
-  text-shadow: none;
-}
-
-/* Race Info Styles */
-.race-info {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  color: white;
-  font-family: 'Arial', sans-serif;
-  z-index: 100;
-}
-
-.lap-counter, .timer, .best-lap, .current-lap-time {
-  background-color: rgba(0, 0, 0, 0.7);
-  border-radius: 8px;
-  padding: 10px 15px;
-  min-width: 150px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.lap-text, .timer-label, .best-lap-label, .current-lap-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: 1px;
-  margin-bottom: 4px;
-}
-
-.lap-value, .timer-value, .best-lap-value, .current-lap-value {
-  font-size: 18px;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-}
-
-.best-lap {
-  background-color: rgba(255, 215, 0, 0.3); /* Gold tint for best lap */
-  border-color: rgba(255, 215, 0, 0.6);
-}
-
-.best-lap-value {
-  color: rgb(255, 215, 0);
-}
-
-.current-lap-time {
-  background-color: rgba(0, 175, 255, 0.3); /* Blue tint for current lap */
-  border-color: rgba(0, 175, 255, 0.6);
-}
-
-/* Race Finished Display */
-.race-finished {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(0, 0, 0, 0.8);
-  border-radius: 15px;
-  padding: 30px;
-  color: white;
-  font-family: 'Arial', sans-serif;
-  text-align: center;
-  min-width: 300px;
-  border: 3px solid gold;
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
-  backdrop-filter: blur(10px);
-  z-index: 1000;
-}
-
-.finished-text {
-  font-size: 36px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: gold;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
-  animation: pulsate 1.5s infinite alternate;
-}
-
-.final-time, .best-lap-final {
-  font-size: 20px;
-  margin-bottom: 10px;
-}
-
-.lap-times {
-  margin-top: 20px;
-  text-align: left;
-}
-
-.lap-times-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 10px;
-  text-align: center;
-}
-
-.lap-time-item {
-  font-size: 14px;
-  margin-bottom: 5px;
-  padding: 5px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-@keyframes pulsate {
-  from {
-    text-shadow: 0 0 5px gold, 0 0 10px gold;
-  }
-  to {
-    text-shadow: 0 0 15px gold, 0 0 20px gold, 0 0 30px gold;
-  }
-}
-
-@media (max-width: 768px) {
-  .race-info {
-    top: 10px;
-    left: 10px;
-    gap: 5px;
-  }
-  
-  .lap-counter, .timer, .best-lap, .current-lap-time {
-    padding: 8px 12px;
-    min-width: 120px;
-  }
-  
-  .lap-text, .timer-label, .best-lap-label, .current-lap-label {
-    font-size: 10px;
-  }
-  
-  .lap-value, .timer-value, .best-lap-value, .current-lap-value {
-    font-size: 16px;
-  }
-  
-  .race-finished {
-    padding: 20px;
-    min-width: 250px;
-  }
-  
-  .finished-text {
-    font-size: 28px;
-  }
-  
-  .final-time, .best-lap-final {
-    font-size: 16px;
-  }
-}
-
-/* Race Countdown */
-.race-countdown {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.countdown-number {
-  font-size: 120px;
-  font-weight: bold;
-  color: white;
-  text-shadow: 0 0 20px rgba(255, 50, 50, 0.8), 0 0 40px rgba(255, 50, 50, 0.6);
-  animation: countdown-pulse 1s ease-in-out infinite alternate;
-  font-family: 'Arial', sans-serif;
-}
-
-.countdown-number.go {
-  color: lime;
-  font-size: 150px;
-  text-shadow: 0 0 20px rgba(50, 255, 50, 0.8), 0 0 40px rgba(50, 255, 50, 0.6);
-  animation: go-pulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes countdown-pulse {
-  from {
-    transform: scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
-}
-
-@keyframes go-pulse {
-  from {
-    transform: scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: scale(1.3);
-    opacity: 0.9;
-  }
-}
-
-/* Error handling styles */
-.init-error {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background-color: rgba(255, 0, 0, 0.7);
-  color: white;
-  padding: 10px 15px;
-  border-radius: 8px;
-  z-index: 1000;
-  font-family: 'Arial', sans-serif;
-  max-width: 300px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  animation: fadeIn 0.5s;
-}
-
-.asset-error {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  background-color: rgba(255, 165, 0, 0.7); /* Orange */
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  z-index: 1000;
-  font-family: 'Arial', sans-serif;
-  max-width: 300px;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
-  animation: fadeIn 0.5s;
-  pointer-events: none; /* Don't block gameplay */
-}
-
-.asset-error-list {
-  margin: 4px 0 0 0;
-  padding-left: 16px;
-  font-size: 10px;
-  opacity: 0.9;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Auto-hide errors after a delay */
-.auto-hide {
-  animation: fadeIn 0.5s, fadeOut 0.5s 5s forwards;
-}
-
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(20px);
-    visibility: hidden;
-  }
-}
-
-/* Add these styles for the vehicle description */
-.vehicle-description {
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  margin-top: var(--space-md);
-  font-size: var(--font-size-sm);
-  width: 90%;
-  text-align: center;
-  box-shadow: var(--shadow-lg);
-  margin-left: auto;
-  margin-right: auto;
-  font-style: italic;
-  line-height: 1.5;
-  letter-spacing: 0.5px;
-  border: 1px solid var(--color-border-primary);
-  animation: glow-subtle 3s infinite alternate;
-  height: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.2);
-}
-
-/* Add styling for webkit scrollbars in the description box */
-.vehicle-description::-webkit-scrollbar {
-  width: 6px;
-}
-
-.vehicle-description::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
-
-.vehicle-description::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-}
-
-/* Add a tooltip to show stat details on hover */
-.stat-row:hover::after {
-  content: none;
-}
-
-/* Character stat spacing adjustments - Fix overflow */
-.character-stats {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-  align-items: center;
-}
-
-.stat-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 90%;
-  position: relative;
-  margin-bottom: 2px;
-}
-
-/* Fix the width of stat labels to prevent overflow */
-.stat-label {
-  font-size: 11px;
-  min-width: 45px;
-  width: 45px;
-  text-align: right;
-  padding-right: 8px;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary);
-  white-space: nowrap;
-  letter-spacing: 0.5px;
-}
-
-.stat-bars {
-  display: flex;
-  gap: 2px;
-  justify-content: flex-start;
-}
-
-.stat-bar {
-  width: 11px;
-  height: 7px;
-  background-color: rgba(255, 255, 255, 0.15); /* More transparent background */
-  border-radius: 2px;
-  margin-right: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Add subtle border */
-}
-
-.stat-bar.filled {
-  background-color: var(--color-primary);
-  box-shadow: 0 0 6px rgba(0, 217, 255, 0.7);
-  border: none; /* Remove border on filled bars */
-}
-
-/* Make sure character card has proper padding for stats */
-.character-card {
-  padding: 10px 10px 15px 10px;
-}
-
-/* Adjust stat display for smaller cards on mobile */
-@media (max-width: 768px) {
-  .stat-label {
-    min-width: 42px;
-    width: 42px;
-    font-size: 10px;
-    padding-right: 6px;
-  }
-  
-  .stat-bar {
-    width: 9px;
-    height: 6px;
-  }
-}
-
-@media (max-width: 480px) {
-  .character-card {
-    width: 140px;
-    height: 190px;
-    padding: 8px 6px;
-  }
-  
-  .stat-label {
-    min-width: 40px;
-    width: 40px;
-    font-size: 9px;
-    padding-right: 5px;
-  }
-  
-  .stat-bar {
-    width: 7px;
-    height: 5px;
-  }
-}
-
-/* Make key hints more compact */
-.keyboard-controls-hint .key-hint {
-  background-color: rgba(50, 50, 50, 0.8);
-  color: var(--color-text-primary);
-  padding: 1px 6px;
-  height: 24px;
-  min-width: 24px;
-  border-radius: var(--radius-sm);
-  margin: 0 1px;
-  font-size: 1em;
-  font-weight: var(--font-weight-medium);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  line-height: 1;
-  white-space: nowrap;
-  text-align: center;
-}
-
-/* Arrow key specific styling */
-.keyboard-controls-hint .key-hint:nth-child(2),
-.keyboard-controls-hint .key-hint:nth-child(3),
-.keyboard-controls-hint .key-hint:nth-child(4),
-.keyboard-controls-hint .key-hint:nth-child(5) {
-  background: linear-gradient(to bottom, rgba(60, 60, 70, 0.9), rgba(40, 40, 50, 0.9));
-  font-size: 1.1em;
-  border-color: rgba(255, 255, 255, 0.3);
-  min-width: 30px;
-  padding: 1px 2px;
-}
-
-/* Ensure consistent spacing */
-.keyboard-controls-hint {
-  padding: var(--space-sm);
-  gap: 4px;
-}
-
-/* Re-add animation that was accidentally removed */
-@keyframes glow-subtle {
-  0% {
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-  }
-  100% {
-    box-shadow: 0 0 20px rgba(0, 200, 255, 0.3);
-  }
-}
-
-/* Responsive Variables */
 @media (max-width: 768px) {
   :root {
     /* Font Sizes - Tablet - INCREASED FOR READABILITY */
@@ -1867,4 +1177,241 @@ body::-webkit-scrollbar {
 .keyboard-controls-hint {
   padding: var(--space-sm);
   gap: 4px;
+}
+
+/* Countdown overlay styling */
+.countdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.traffic-light {
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 30px;
+  border: 4px solid rgba(40, 40, 40, 0.9);
+  box-shadow: 
+    0 0 25px rgba(0, 0, 0, 0.6), 
+    inset 0 0 15px rgba(0, 0, 0, 0.7);
+  position: relative;
+  overflow: hidden;
+  /* Add metallic texture gradient */
+  background-image: 
+    linear-gradient(175deg, 
+      rgba(70, 70, 70, 0.25) 0%, 
+      rgba(20, 20, 20, 0.5) 50%, 
+      rgba(10, 10, 10, 0.7) 100%);
+}
+
+/* Add texture to traffic light */
+.traffic-light::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Add diagonal pattern */
+  background-image: 
+    linear-gradient(45deg, rgba(0, 0, 0, 0.1) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.1) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.1) 75%);
+  background-size: 10px 10px;
+  pointer-events: none;
+  opacity: 0.3;
+  z-index: 0;
+}
+
+/* Add perforated pattern to traffic light */
+.traffic-light::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Add perforated pattern using radial gradient */
+  background-image: 
+    radial-gradient(circle at 3px 3px, rgba(0, 0, 0, 0.2) 1px, transparent 2px);
+  background-size: 8px 8px;
+  pointer-events: none;
+  opacity: 0.5;
+  z-index: 0;
+}
+
+/* Add screws to traffic light corners */
+.traffic-light .corner-screw {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #444, #222);
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.8);
+  z-index: 2;
+}
+
+.traffic-light .corner-screw:nth-child(1) {
+  top: 6px;
+  left: 6px;
+}
+
+.traffic-light .corner-screw:nth-child(2) {
+  top: 6px;
+  right: 6px;
+}
+
+.traffic-light .corner-screw:nth-child(3) {
+  bottom: 6px;
+  left: 6px;
+}
+
+.traffic-light .corner-screw:nth-child(4) {
+  bottom: 6px;
+  right: 6px;
+}
+
+.light {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  margin: 12px;
+  border: 3px solid rgba(20, 20, 20, 0.8);
+  box-shadow: 
+    inset 0 0 15px rgba(0, 0, 0, 0.7),
+    0 0 10px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+  /* Add metallic rim effect */
+  background-image: radial-gradient(circle at center, 
+    rgba(60, 60, 60, 0.3) 0%, 
+    rgba(30, 30, 30, 0.5) 80%);
+}
+
+/* Add reflection to light */
+.light::before {
+  content: "";
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 20%;
+  height: 20%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  filter: blur(2px);
+  z-index: 2;
+}
+
+/* Add crossmark texture to lights */
+.light::after {
+  content: "✕";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 30px;
+  color: rgba(0, 0, 0, 0.15);
+  font-weight: var(--font-weight-black);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.light.red {
+  background-color: #441111;
+}
+
+.light.yellow {
+  background-color: #443311;
+}
+
+.light.green {
+  background-color: #114411;
+}
+
+.light.red.active {
+  background-color: #ff0000;
+  box-shadow: 
+    0 0 25px rgba(255, 0, 0, 0.8), 
+    inset 0 0 15px rgba(255, 255, 255, 0.7);
+  background-image: 
+    radial-gradient(circle at center, 
+      rgba(255, 150, 150, 0.8) 0%, 
+      rgba(255, 0, 0, 1) 60%);
+}
+
+.light.yellow.active {
+  background-color: #ffff00;
+  box-shadow: 
+    0 0 25px rgba(255, 255, 0, 0.8), 
+    inset 0 0 15px rgba(255, 255, 255, 0.7);
+  background-image: 
+    radial-gradient(circle at center, 
+      rgba(255, 255, 150, 0.8) 0%, 
+      rgba(255, 255, 0, 1) 60%);
+}
+
+.light.green.active {
+  background-color: #00ff00;
+  box-shadow: 
+    0 0 25px rgba(0, 255, 0, 0.8), 
+    inset 0 0 15px rgba(255, 255, 255, 0.7);
+  background-image: 
+    radial-gradient(circle at center, 
+      rgba(150, 255, 150, 0.8) 0%, 
+      rgba(0, 255, 0, 1) 60%);
+}
+
+/* Hide the X when light is active */
+.light.active::after {
+  opacity: 0.1;
+}
+
+.countdown-number {
+  font-size: 180px; /* Increased from 120px */
+  font-weight: var(--font-weight-black);
+  color: white;
+  text-shadow: 
+    0 0 20px rgba(0, 217, 255, 0.9), 
+    0 0 40px rgba(0, 217, 255, 0.7),
+    0 0 60px rgba(0, 217, 255, 0.5);
+  font-family: var(--font-primary);
+  animation: pulse 1s infinite;
+  line-height: 1;
+  margin-top: 20px;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+  .light {
+    width: 40px;
+    height: 40px;
+    margin: 8px;
+  }
+  
+  .light::after {
+    font-size: 20px;
+  }
+  
+  .countdown-number {
+    font-size: 120px;
+  }
 }

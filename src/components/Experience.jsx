@@ -49,6 +49,7 @@ import { CuboidCollider } from "@react-three/rapier";
 import { useAudioFallback } from "./useAudioFallback";
 import { useErrorTracker } from './ErrorTracker';
 import { SafePositionalAudio } from './SafePositionalAudio';
+import { VehicleStatsDebug } from './VehicleStatsDebug';
 
 // Define checkpoints - positions around the track
 const checkpoints = [
@@ -89,7 +90,9 @@ export const Experience = () => {
     nextCheckpointIndex,
     currentLap,
     totalLaps,
-    isRaceFinished
+    isRaceFinished,
+    countdownActive,
+    kartPlacedOnGround
   } = useStore();
   const [networkBananas, setNetworkBananas] = useMultiplayerState(
     "bananas",
@@ -113,6 +116,9 @@ export const Experience = () => {
   
   const lapCompleteSound = useRef();
   const raceFinishSound = useRef();
+  
+  // Add a ref to track when the kart is initially positioned
+  const kartPositioned = useRef(false);
   
   useEffect(() => {
     // Allow toggling checkpoint visibility for debugging
@@ -196,13 +202,13 @@ export const Experience = () => {
   const speedFactor = 5;
   const { texture } = useLoader(LUTCubeLoader, "./cubicle-99.CUBE");
   useFrame((state, delta) => {
-    if (gameStarted) {
-      // Increment race timer if game has started
+    if (gameStarted && !countdownActive) {
+      // Game is fully active - increment race timer
       actions.incrementRaceTime(delta);
-    } else {
-      // Existing camera animation logic when game hasn't started
+    } else if (!gameStarted) {
+      // Not started yet - use the cinematic camera 
       const camera = cam.current;
-      if (currentPoint < pointest.length - 1) {
+      if (camera && lookAtTarget.current && currentPoint < pointest.length - 1) {
         camera.position.lerp(pointest[currentPoint], delta * speedFactor);
         lookAtTarget.current.position.lerp(
           pointest[currentPoint + 1],
@@ -213,15 +219,120 @@ export const Experience = () => {
         if (camera.position.distanceTo(pointest[currentPoint]) < 5) {
           setCurrentPoint(currentPoint + 1);
         }
-      } else {
+      } else if (camera && lookAtTarget.current) {
         setCurrentPoint(0);
+      }
+    } else if (gameStarted && countdownActive) {
+      // When game started and countdown is active - handle kart falling and landing
+      if (players.length > 0) {
+        // Find the local player
+        const localPlayer = players.find(p => p.id === id);
+        
+        if (localPlayer && localPlayer.body) {
+          // Get current position of the kart
+          const kartPosition = localPlayer.body.translation();
+          
+          // Check if kart has landed (y position close to 2, which is ground level)
+          if (!kartPlacedOnGround && kartPosition.y <= 2.5) {
+            console.log("Kart has landed on the ground");
+            
+            // Ensure the kart is exactly at ground level
+            localPlayer.body.setTranslation({ 
+              x: kartPosition.x, 
+              y: 2, 
+              z: kartPosition.z 
+            }, true);
+            
+            // Mark as positioned on ground
+            actions.setKartPlacedOnGround(true);
+          }
+          
+          // If kart hasn't been positioned yet, apply gravity manually
+          // (this helps with smoother falling and camera following)
+          if (!kartPlacedOnGround && kartPosition.y > 2.5) {
+            // Apply gravity to make the kart fall naturally
+            localPlayer.body.applyImpulse({ x: 0, y: -9.8 * 3, z: 0 }, true);
+          }
+        }
       }
     }
   });
 
+  // We'll keep this function to be called by the HUD countdown
+  const handleCountdownComplete = () => {
+    // This will be handled by the HUD countdown component now
+    // We can remove this function later if needed
+  };
+
+  // Place kart at starting position when game starts
+  useEffect(() => {
+    if (gameStarted && players.length > 0 && !kartPlacedOnGround) {
+      console.log("Attempting to place kart on ground");
+      
+      // Find the local player
+      const localPlayer = players.find(p => p.id === id);
+      console.log("Local player:", localPlayer);
+      
+      // Position the kart at the starting position ON THE TRACK but ELEVATED IN THE AIR
+      const startPosition = [-20, 60, -119]; // Starting line position but elevated in the air
+      
+      // Wait for body to be initialized
+      if (localPlayer && localPlayer.body) {
+        console.log("Found player body, placing kart at starting position in the air");
+        try {
+          // Set position high in the air
+          localPlayer.body.setTranslation({ 
+            x: startPosition[0], 
+            y: startPosition[1], // Elevated position
+            z: startPosition[2] 
+          }, true);
+          
+          // Zero out any velocities to ensure a clean drop
+          localPlayer.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          localPlayer.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          
+          // Set rotation to face forward down the track (along the positive Z direction)
+          localPlayer.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+          
+          console.log("Kart placed at elevated starting position");
+          
+          // Mark kart as placed and start countdown immediately
+          // We're not setting kartPlacedOnGround to true yet - that will happen when it actually lands
+          actions.startCountdown();
+          console.log("Countdown started while kart is falling");
+        } catch (error) {
+          console.error("Error placing kart:", error);
+        }
+      } else {
+        console.log("Player body not found, setting a retry timer");
+        // Retry after a short delay if body is not yet initialized
+        const timer = setTimeout(() => {
+          if (!kartPlacedOnGround) {
+            actions.startCountdown();
+            console.log("Forcing countdown start after delay");
+          }
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [gameStarted, players, id, kartPlacedOnGround, actions]);
+
   return (
     <>
-      {gameStarted &&
+      {/* Only use cinematic camera when the game hasn't started at all */}
+      {!gameStarted ? (
+        <>
+          <mesh ref={lookAtTarget}></mesh>
+          <PerspectiveCamera
+            ref={cam}
+            makeDefault
+            position={[0, 2, 0]}
+            far={5000}
+          />
+        </>
+      ) : (
+        // For both countdown and active gameplay, use the camera from the player controller
+        // This ensures camera consistency between countdown and gameplay
         players.map((player) => {
           const ControllerComponent =
             controls === "keyboard"
@@ -232,8 +343,7 @@ export const Experience = () => {
               ? PlayerControllerTouch
               : PlayerController;
 
-          // Only show controller for active racers
-          return !isRaceFinished || player.id !== id ? (
+          return player.id === id ? (
             <ControllerComponent
               key={player.id}
               player={player}
@@ -242,9 +352,13 @@ export const Experience = () => {
               setNetworkShells={setNetworkShells}
               networkBananas={networkBananas}
               networkShells={networkShells}
+              countdownFreeze={countdownActive} // Pass countdown state to controllers
             />
           ) : null;
-        })}
+        })
+      )}
+      
+      {/* Show player dummies regardless of countdown state */}
       {gameStarted &&
         players.map((player) => (
           <PlayerDummies
@@ -253,18 +367,7 @@ export const Experience = () => {
             userPlayer={player.id === myPlayer()?.id}
           />
         ))}
-      {!gameStarted && (
-        <>
-          <mesh ref={lookAtTarget}></mesh>
-          <PerspectiveCamera
-            ref={cam}
-            makeDefault
-            position={[0, 2, 0]}
-            far={5000}
-          />
-        </>
-      )}
-
+        
       <ParisBis position={[0, 0, 0]} />
       <ItemBox position={[-20, 2.5, -119]} />
       <Coin position={[-30, 2, -119]} />
@@ -373,6 +476,8 @@ export const Experience = () => {
         distance={5}
         loop={false}
       />
+
+      <VehicleStatsDebug />
     </>
   );
 };

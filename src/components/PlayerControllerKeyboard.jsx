@@ -33,6 +33,7 @@ export const PlayerControllerKeyboard = ({
   setNetworkShells,
   networkBananas,
   networkShells,
+  countdownFreeze
 }) => {
   const upPressed = useKeyboardControls((state) => state[Controls.up]);
   const downPressed = useKeyboardControls((state) => state[Controls.down]);
@@ -110,6 +111,8 @@ export const PlayerControllerKeyboard = ({
     if (player.id !== id) return;
     const time = clock.getElapsedTime();
     if (!body.current && !mario.current) return;
+    
+    // Still play engine sounds during countdown
     engineSound.current.setVolume(currentSpeed / 300 + 0.2);
     engineSound.current.setPlaybackRate(currentSpeed / 10 + 0.1);
     jumpSound.current.setPlaybackRate(1.5);
@@ -137,22 +140,31 @@ export const PlayerControllerKeyboard = ({
       actions.setGameStarted(false);
     }
 
+    // Calculate steering input, but only apply rotation if not in countdown
     if (leftPressed && currentSpeed > 0) {
-      steeringAngle = currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
     } else if (rightPressed && currentSpeed > 0) {
-      steeringAngle = -currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
     } else if (rightPressed && currentSpeed < 0) {
-      steeringAngle = currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
     } else if (leftPressed && currentSpeed < 0) {
-      steeringAngle = -currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
     } else {
       steeringAngle = 0;
       targetXPosition = 0;
-      1;
+      setSteeringAngleWheels(0);
     }
 
     // ACCELERATING
@@ -160,9 +172,15 @@ export const PlayerControllerKeyboard = ({
 
     if (upPressed && currentSpeed < maxSpeed) {
       // Accelerate the kart within the maximum speed limit
-      setCurrentSpeed(
-        Math.min(currentSpeed + acceleration * delta * 144, maxSpeed)
-      );
+      // Only apply movement if not in countdown
+      if (!countdownFreeze) {
+        setCurrentSpeed(
+          Math.min(currentSpeed + acceleration * delta * 144, maxSpeed)
+        );
+      } else {
+        // During countdown, rev the engine but don't move
+        // Just play the sound by allowing the engine sound logic to work
+      }
     } else if (
       upPressed &&
       currentSpeed > maxSpeed &&
@@ -425,17 +443,27 @@ export const PlayerControllerKeyboard = ({
       0.01 * delta * 144
     );
 
-    body.current.applyImpulse(
-      {
-        x: forwardDirection.x * currentSpeed * delta * 144,
-        y: 0 + jumpForce.current * delta * 144,
-        z: forwardDirection.z * currentSpeed * delta * 144,
-      },
-      true
-    );
-
-    // Update the kart's rotation based on the steering angle
-    setSteeringAngleWheels(steeringAngle * 25);
+    // Apply movement impulse only if not in countdown
+    if (!countdownFreeze) {
+      body.current.applyImpulse(
+        {
+          x: forwardDirection.x * currentSpeed * delta * 144,
+          y: 0 + jumpForce.current * delta * 144,
+          z: forwardDirection.z * currentSpeed * delta * 144,
+        },
+        true
+      );
+    } else {
+      // During countdown, only apply vertical force (for jumps)
+      body.current.applyImpulse(
+        {
+          x: 0,
+          y: 0 + jumpForce.current * delta * 144,
+          z: 0,
+        },
+        true
+      );
+    }
 
     // SOUND WORK
 

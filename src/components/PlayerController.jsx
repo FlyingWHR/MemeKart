@@ -23,6 +23,7 @@ import { HitParticles } from "./Particles/hits/HitParticles";
 import { CoinParticles } from "./Particles/coins/CoinParticles";
 import { ItemParticles } from "./Particles/items/ItemParticles";
 import { geometry } from "maath";
+import { getVehicleStatsForCharacter } from "../config/vehicleStats";
 extend(geometry);
 
 export const PlayerController = ({
@@ -32,6 +33,7 @@ export const PlayerController = ({
   setNetworkShells,
   networkBananas,
   networkShells,
+  countdownFreeze
 }) => {
   const upPressed = useKeyboardControls((state) => state[Controls.up]);
   const downPressed = useKeyboardControls((state) => state[Controls.down]);
@@ -46,13 +48,32 @@ export const PlayerController = ({
   const body = useRef();
   const kart = useRef();
   const cam = useRef();
-  const initialSpeed = 0;
-  const maxSpeed = 30;
-  const boostSpeed = 50;
-  const acceleration = 0.1;
-  const decceleration = 0.2;
-  const damping = -0.1;
-  const MaxSteeringSpeed = 0.01;
+  
+  // Get the selected character from the store
+  const { actions, shouldSlowDown, item, bananas, coins, id, controls, selectedCharacter } = useStore();
+  
+  // Get the vehicle stats for the selected character
+  const characterStats = getVehicleStatsForCharacter(selectedCharacter);
+  
+  // Base physics values
+  const baseInitialSpeed = 0;
+  const baseMaxSpeed = 30;
+  const baseBoostSpeed = 50;
+  const baseAcceleration = 0.1;
+  const baseDecceleration = 0.2;
+  const baseDamping = -0.1;
+  const baseMaxSteeringSpeed = 0.01;
+  const baseJumpForce = 10;
+  
+  // Apply character-specific multipliers to the physics values
+  const initialSpeed = baseInitialSpeed;
+  const maxSpeed = baseMaxSpeed * characterStats.maxSpeedMultiplier;
+  const boostSpeed = baseBoostSpeed * characterStats.maxSpeedMultiplier;
+  const acceleration = baseAcceleration * characterStats.accelerationMultiplier;
+  const decceleration = baseDecceleration;
+  const damping = baseDamping;
+  const MaxSteeringSpeed = baseMaxSteeringSpeed * characterStats.handlingMultiplier;
+  
   const [currentSteeringSpeed, setCurrentSteeringSpeed] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(initialSpeed);
   const camMaxOffset = 1;
@@ -91,22 +112,34 @@ export const PlayerController = ({
   const effectiveBoost = useRef(0);
   const text = useRef();
 
-  const { actions, shouldSlowDown, item, bananas, coins, id, controls } =
-    useStore();
   const slowDownDuration = useRef(1500);
 
   const rightWheel = useRef();
   const leftWheel = useRef();
+  
   useEffect(() => {
     if (leftWheel.current && rightWheel.current && body.current) {
       actions.setLeftWheel(leftWheel.current);
       actions.setRightWheel(rightWheel.current);
     }
-  }, [body.current]);
+    
+    // Apply weight multiplier to physics body when character changes
+    if (body.current) {
+      // Note: This is a simplified implementation - in a real game you'd 
+      // adjust mass more directly, but we're adapting the existing code
+      body.current.setMassProperties({
+        mass: 1 * characterStats.weightMultiplier,
+        centerOfMass: { x: 0, y: 0, z: 0 },
+      });
+    }
+  }, [body.current, selectedCharacter]);
+  
   useFrame(({ pointer, clock }, delta) => {
     if (player.id !== id) return;
     const time = clock.getElapsedTime();
     if (!body.current && !mario.current) return;
+    
+    // Continue playing engine sounds during countdown
     engineSound.current.setVolume(currentSpeed / 300 + 0.2);
     engineSound.current.setPlaybackRate(currentSpeed / 10 + 0.1);
     jumpSound.current.setPlaybackRate(1.5);
@@ -137,22 +170,32 @@ export const PlayerController = ({
     if(kartRotation){
       leftWheel.current.kartRotation = kartRotation;
     }
+    
+    // Calculate steering input, but only apply rotation if not in countdown
     if (leftPressed && currentSpeed > 0) {
-      steeringAngle = currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
     } else if (rightPressed && currentSpeed > 0) {
-      steeringAngle = -currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
     } else if (rightPressed && currentSpeed < 0) {
-      steeringAngle = currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
     } else if (leftPressed && currentSpeed < 0) {
-      steeringAngle = -currentSteeringSpeed;
+      steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
+      // Still set wheel visuals even during countdown
+      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
     } else {
       steeringAngle = 0;
       targetXPosition = 0;
-      1;
+      setSteeringAngleWheels(0);
     }
 
     // mouse steering
@@ -264,7 +307,8 @@ export const PlayerController = ({
 
     // JUMPING
     if (jumpPressed && isOnGround && !jumpIsHeld.current) {
-      jumpForce.current += 10;
+      // Apply jump force with character's jump multiplier
+      jumpForce.current += baseJumpForce * characterStats.jumpForceMultiplier;
       isOnFloor.current = false;
       jumpIsHeld.current = true;
       jumpSound.current.play();
@@ -333,8 +377,9 @@ export const PlayerController = ({
       );
       if (isOnFloor.current) {
         leftWheel.current.isSpinning = true;
+        // Apply drift power multiplier based on character stats
         accumulatedDriftPower.current +=
-          0.1 * (steeringAngle + 1) * delta * 144;
+          0.1 * (steeringAngle + 1) * delta * 144 * characterStats.driftPowerMultiplier;
       }
     }
     if (driftRight.current) {
@@ -347,8 +392,8 @@ export const PlayerController = ({
       );
       if(isOnFloor.current){
         leftWheel.current.isSpinning = true;
-        accumulatedDriftPower.current += 0.1 * (-steeringAngle + 1) * delta * 144;
-
+        // Apply drift power multiplier based on character stats
+        accumulatedDriftPower.current += 0.1 * (-steeringAngle + 1) * delta * 144 * characterStats.driftPowerMultiplier;
       }
     }
     if (!driftLeft.current && !driftRight.current) {
@@ -438,14 +483,27 @@ export const PlayerController = ({
       0.01 * delta * 144
     );
 
-    body.current.applyImpulse(
-      {
-        x: forwardDirection.x * currentSpeed * delta * 144,
-        y: 0 + jumpForce.current * delta * 144,
-        z: forwardDirection.z * currentSpeed * delta * 144,
-      },
-      true
-    );
+    // Apply movement impulse only if not in countdown
+    if (!countdownFreeze) {
+      body.current.applyImpulse(
+        {
+          x: forwardDirection.x * currentSpeed * delta * 144,
+          y: 0 + jumpForce.current * delta * 144,
+          z: forwardDirection.z * currentSpeed * delta * 144,
+        },
+        true
+      );
+    } else {
+      // During countdown, only apply vertical force (for jumps)
+      body.current.applyImpulse(
+        {
+          x: 0,
+          y: 0 + jumpForce.current * delta * 144,
+          z: 0,
+        },
+        true
+      );
+    }
 
     // Update the kart's rotation based on the steering angle
     setSteeringAngleWheels(steeringAngle * 25);

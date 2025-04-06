@@ -10,7 +10,7 @@ MemeKart is a web-based racing game inspired by classic kart racing games but fe
 
 ## Credits
 
-This game is based on [Mario Kart JS](https://codespaces.new/Lunakepio/Mario-Kart-3.js) by Lunakepio. MemeKart builds upon this foundation with additional features and meme-themed content.
+This game is based on [Mario Kart JS](https://github.com/Lunakepio/Mario-Kart-3.js) by Lunakepio. MemeKart builds upon this foundation with additional features and meme-themed content.
 
 ## Demo
 

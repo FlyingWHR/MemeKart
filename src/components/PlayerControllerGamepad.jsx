@@ -32,6 +32,7 @@ export const PlayerControllerGamepad = ({
   setNetworkShells,
   networkBananas,
   networkShells,
+  countdownFreeze
 }) => {
   const [isOnGround, setIsOnGround] = useState(false);
   const body = useRef();
@@ -132,24 +133,40 @@ export const PlayerControllerGamepad = ({
     }
     leftWheel.current.kartRotation = kartRotation ;
 
+    // Handle joystick input, but only apply rotation if not in countdown
     if (!driftLeft.current && !driftRight.current) {
-      steeringAngle = currentSteeringSpeed * -joystick[0];
+      // Store the visual steering for wheels
+      const visualSteering = currentSteeringSpeed * -joystick[0];
+      // Apply steering only if not in countdown
+      steeringAngle = countdownFreeze ? 0 : visualSteering;
       targetXPosition = -camMaxOffset * -joystick[0];
+      // Set wheel visuals always
+      setSteeringAngleWheels(visualSteering * 25);
     } else if (driftLeft.current && !driftRight.current) {
-      steeringAngle = currentSteeringSpeed * -(joystick[0] - 1);
+      const visualSteering = currentSteeringSpeed * -(joystick[0] - 1);
+      steeringAngle = countdownFreeze ? 0 : visualSteering;
       targetXPosition = -camMaxOffset * -joystick[0];
+      setSteeringAngleWheels(visualSteering * 25);
     } else if (driftRight.current && !driftLeft.current) {
-      steeringAngle = currentSteeringSpeed * -(joystick[0] + 1);
+      const visualSteering = currentSteeringSpeed * -(joystick[0] + 1);
+      steeringAngle = countdownFreeze ? 0 : visualSteering;
       targetXPosition = -camMaxOffset * -joystick[0];
+      setSteeringAngleWheels(visualSteering * 25);
     }
     // ACCELERATING
     const shouldSlow = actions.getShouldSlowDown();
 
     if (buttonA && currentSpeed < maxSpeed) {
       // Accelerate the kart within the maximum speed limit
-      setCurrentSpeed(
-        Math.min(currentSpeed + acceleration * delta * 144, maxSpeed)
-      );
+      // Only apply movement if not in countdown
+      if (!countdownFreeze) {
+        setCurrentSpeed(
+          Math.min(currentSpeed + acceleration * delta * 144, maxSpeed)
+        );
+      } else {
+        // During countdown, rev the engine but don't move
+        // Just play the sound by allowing the engine sound logic to work
+      }
     } else if (
       buttonA &&
       currentSpeed > maxSpeed &&
@@ -412,17 +429,30 @@ export const PlayerControllerGamepad = ({
       0.01 * delta * 144
     );
 
-    body.current.applyImpulse(
-      {
-        x: forwardDirection.x * currentSpeed * delta * 144,
-        y: 0 + jumpForce.current * delta * 144,
-        z: forwardDirection.z * currentSpeed * delta * 144,
-      },
-      true
-    );
+    // Apply movement impulse only if not in countdown
+    if (!countdownFreeze) {
+      body.current.applyImpulse(
+        {
+          x: forwardDirection.x * currentSpeed * delta * 144,
+          y: 0 + jumpForce.current * delta * 144,
+          z: forwardDirection.z * currentSpeed * delta * 144,
+        },
+        true
+      );
+    } else {
+      // During countdown, only apply vertical force (for jumps)
+      body.current.applyImpulse(
+        {
+          x: 0,
+          y: 0 + jumpForce.current * delta * 144,
+          z: 0,
+        },
+        true
+      );
+    }
 
-    // Update the kart's rotation based on the steering angle
-    setSteeringAngleWheels(steeringAngle * 25);
+    // Update the kart's rotation based on the steering angle is now handled in the steering logic section
+    // setSteeringAngleWheels(steeringAngle * 25);
 
     // SOUND WORK
 

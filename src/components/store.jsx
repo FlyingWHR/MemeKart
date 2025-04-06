@@ -38,6 +38,13 @@ export const useStore = create((set, get) => ({
   isDrifting: false,
   currentSpeed: 0,
   selectedCharacter: "doge",
+  currentLap: 0,
+  raceTime: 0,
+  nextCheckpointIndex: 0,
+  totalLaps: 3,
+  isRaceFinished: false,
+  countdownActive: false,
+  kartPlacedOnGround: false,
   
   characters: [
     { id: "doge", name: "Doge", speed: 3, acceleration: 3, handling: 3, weight: 3, image: "/images/characters/doge.png" },
@@ -205,6 +212,50 @@ export const useStore = create((set, get) => ({
     },
     getCurrentSpeed: () => {
       return get().currentSpeed;
+    },
+    setLap: (lap) => {
+      set({ currentLap: lap });
+    },
+    incrementRaceTime: (deltaTime) => {
+      set((state) => ({ raceTime: state.raceTime + deltaTime }));
+    },
+    resetRace: () => {
+      set({ 
+        currentLap: 1, 
+        raceTime: 0, 
+        nextCheckpointIndex: 0,
+        isRaceFinished: false 
+      });
+    },
+    setNextCheckpoint: (checkpointIndex) => {
+      set({ nextCheckpointIndex: checkpointIndex });
+    },
+    incrementLap: () => {
+      set((state) => {
+        const newLap = state.currentLap + 1;
+        const isFinished = newLap > state.totalLaps;
+        return { 
+          currentLap: newLap,
+          isRaceFinished: isFinished 
+        };
+      });
+    },
+    finishRace: () => {
+      set({ isRaceFinished: true });
+    },
+    setKartPlacedOnGround: (placed) => {
+      console.log(`Setting kartPlacedOnGround to ${placed}`);
+      set({ kartPlacedOnGround: placed });
+    },
+    startCountdown: () => {
+      console.log("Starting countdown");
+      set({ countdownActive: true });
+    },
+    endCountdown: () => {
+      console.log("Ending countdown");
+      set({ countdownActive: false });
+      set(state => ({ raceTime: 0 }));
+      console.log("Race timer reset");
     }
   }
 }));

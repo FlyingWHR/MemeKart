@@ -75,6 +75,9 @@ const CharacterSelection = ({ onBack, onSelect }) => {
   // Add a ready state to prevent immediate Enter key processing
   const [isReady, setIsReady] = useState(false);
   const modelContainerRef = useRef(); // Reference for model container animations
+  
+  // Reference to track character cards
+  const characterCardsRef = useRef([]);
 
   // Set ready state after a short delay
   useEffect(() => {
@@ -127,9 +130,8 @@ const CharacterSelection = ({ onBack, onSelect }) => {
           break;
           
         case 'Enter':
-          // If a character card is focused or select button has focus
-          if (document.activeElement.classList.contains('character-card') ||
-              document.activeElement.classList.contains('select-btn')) {
+          // If a character is focused
+          if (focusedIndex >= 0 && focusedIndex < characters.length) {
             // Select the currently focused character
             actions.setSelectedCharacter(currentCharacter);
             onSelect();
@@ -147,7 +149,7 @@ const CharacterSelection = ({ onBack, onSelect }) => {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [characters, currentCharacter, actions, onSelect, onBack, isReady]);
+  }, [characters, currentCharacter, actions, onSelect, onBack, isReady, focusedIndex]);
 
   // Handle character selection with animation
   const handleCharacterSelect = (characterId) => {
@@ -177,27 +179,39 @@ const CharacterSelection = ({ onBack, onSelect }) => {
 
   // Focus on the character card when component mounts or focusedIndex changes
   useEffect(() => {
-    const cards = document.querySelectorAll('.character-card');
-    if (cards && cards.length > 0 && cards[focusedIndex]) {
-      cards[focusedIndex].focus();
+    // Visually select only the focused character card by updating refs
+    if (characterCardsRef.current && characterCardsRef.current.length > 0) {
+      // Update currentCharacter to match the focused index
+      const focusedCharacter = characters[focusedIndex].id;
+      handleCharacterSelect(focusedCharacter);
       
-      // Trigger the character select animation when navigating with keyboard
-      handleCharacterSelect(characters[focusedIndex].id);
+      // Programmatically focus the card for keyboard navigation
+      if (characterCardsRef.current[focusedIndex]) {
+        characterCardsRef.current[focusedIndex].focus();
+      }
     }
   }, [focusedIndex, characters]);
 
   // Helper function to render stat bars
-  const renderStatBars = (statValue) => {
+  const renderStatBars = (statValue = 0) => {
+    // Add a default value of 0 and ensure it's a number
+    const value = typeof statValue === 'number' ? statValue : 0;
+    
     return Array.from({ length: 5 }).map((_, index) => (
       <div
         key={index}
-        className={`stat-bar ${index < statValue ? "filled" : ""}`}
+        className={`stat-bar ${index < value ? "filled" : ""}`}
       />
     ));
   };
 
   // Get vehicle stats description for the selected character
   const vehicleStats = getVehicleStatsForCharacter(currentCharacter);
+
+  // Initialize character cards ref array
+  useEffect(() => {
+    characterCardsRef.current = characterCardsRef.current.slice(0, characters.length);
+  }, [characters.length]);
 
   return (
     <div className="character-selection">
@@ -256,7 +270,8 @@ const CharacterSelection = ({ onBack, onSelect }) => {
                 className={`character-card ${currentCharacter === character.id ? 'selected' : ''}`}
                 onClick={() => handleCharacterSelect(character.id)}
                 tabIndex={0}
-                onFocus={() => setCurrentCharacter(character.id)}
+                ref={el => characterCardsRef.current[index] = el}
+                onFocus={() => setFocusedIndex(index)}
                 aria-selected={currentCharacter === character.id}
                 data-index={index}
               >
@@ -266,27 +281,21 @@ const CharacterSelection = ({ onBack, onSelect }) => {
                 <div className="character-name">{character.name}</div>
                 <div className="character-stats">
                   <div className="stat-row">
-                    <div className="stat-label">Speed</div>
+                    <span className="stat-label">Speed</span>
                     <div className="stat-bars">
                       {renderStatBars(character.speed)}
                     </div>
                   </div>
                   <div className="stat-row">
-                    <div className="stat-label">Accel</div>
+                    <span className="stat-label">Accel</span>
                     <div className="stat-bars">
                       {renderStatBars(character.acceleration)}
                     </div>
                   </div>
                   <div className="stat-row">
-                    <div className="stat-label">Handle</div>
+                    <span className="stat-label">Handling</span>
                     <div className="stat-bars">
                       {renderStatBars(character.handling)}
-                    </div>
-                  </div>
-                  <div className="stat-row">
-                    <div className="stat-label">Weight</div>
-                    <div className="stat-bars">
-                      {renderStatBars(character.weight)}
                     </div>
                   </div>
                 </div>
@@ -298,25 +307,20 @@ const CharacterSelection = ({ onBack, onSelect }) => {
             <button 
               className="back-btn" 
               onClick={onBack}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onBack();
-                }
-              }}
-            >BACK</button>
+              tabIndex={0}
+            >
+              Back
+            </button>
             <button 
-              className="select-btn" 
+              className="select-btn"
               onClick={() => {
                 actions.setSelectedCharacter(currentCharacter);
                 onSelect();
               }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  actions.setSelectedCharacter(currentCharacter);
-                  onSelect();
-                }
-              }}
-            >START</button>
+              tabIndex={0}
+            >
+              Select
+            </button>
           </div>
         </div>
       </div>
@@ -500,8 +504,11 @@ export const Landing = () => {
   }, [setupStatus]);
 
   const handleStartGame = () => {
+    console.log("Starting game");
     actions.setControls("keyboard");
     actions.setGameStarted(true);
+    console.log("Game started flag set");
+    // The countdown and kart placement will be handled in Experience component
   };
 
   const handleCharacterSelected = () => {
