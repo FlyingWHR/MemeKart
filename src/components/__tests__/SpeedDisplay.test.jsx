@@ -86,6 +86,24 @@ vi.mock('three', () => ({
   Raycaster: vi.fn(() => ({
     set: vi.fn(),
     intersectObjects: vi.fn(() => [])
+  })),
+  Euler: vi.fn(() => ({
+    set: vi.fn(),
+    toVector3: vi.fn(() => ({ x: 0, y: 0, z: 0 }))
+  })),
+  Matrix4: vi.fn(() => ({
+    makeRotationFromEuler: vi.fn(),
+    identity: vi.fn(),
+    multiply: vi.fn()
+  })),
+  Object3D: vi.fn(() => ({
+    position: { set: vi.fn() },
+    rotation: { set: vi.fn() }
+  })),
+  Quaternion: vi.fn(() => ({
+    setFromEuler: vi.fn(),
+    multiply: vi.fn(),
+    normalize: vi.fn()
   }))
 }));
 

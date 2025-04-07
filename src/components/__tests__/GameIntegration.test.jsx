@@ -78,7 +78,7 @@ describe('Game Integration Tests', () => {
     render(<Landing />);
     
     // The landing page should be visible
-    expect(screen.getByText('PRESS ENTER TO START')).toBeInTheDocument();
+    expect(screen.getByText('PRESS ENTER TO CONTINUE')).toBeInTheDocument();
   });
   
   it('shows controls appropriate to the selected input method', () => {

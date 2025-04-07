@@ -1,3 +1,50 @@
+// Replace three.js Vector3 with a simple implementation for tests
+vi.mock('three', () => {
+  class MockVector3 {
+    constructor(x = 0, y = 0, z = 0) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+    }
+    
+    distanceTo(other) {
+      const dx = this.x - other.x;
+      const dy = this.y - other.y;
+      const dz = this.z - other.z;
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    
+    subVectors(a, b) {
+      this.x = a.x - b.x;
+      this.y = a.y - b.y;
+      this.z = a.z - b.z;
+      return this;
+    }
+    
+    normalize() {
+      const length = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+      if (length > 0) {
+        this.x /= length;
+        this.y /= length;
+        this.z /= length;
+      }
+      return this;
+    }
+    
+    dot(other) {
+      return this.x * other.x + this.y * other.y + this.z * other.z;
+    }
+    
+    length() {
+      return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    }
+  }
+  
+  return {
+    Vector3: MockVector3
+  };
+});
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Vector3 } from 'three';
 
