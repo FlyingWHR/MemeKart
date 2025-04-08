@@ -1,7 +1,11 @@
 import { Particles1 } from "./Particles1";
 import { Particles3 } from "./Particles3";
 
-export const DriftParticlesLeft = ({turboColor,scale, ...props}) => {
+export const DriftParticlesLeft = ({
+  fireColor = 0xffffff,
+  scale = 0,
+  ...props
+}) => {
 
   // if(scale < 0.8) {
   //   return null;
@@ -9,24 +13,24 @@ export const DriftParticlesLeft = ({turboColor,scale, ...props}) => {
 
   return (
     <group {...props}>
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
-      <Particles1 turboColor={turboColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
+      <Particles1 turboColor={fireColor} scale={scale} />
       {/* <Particles3 turboColor={turboColor} scale={scale} /> */}
 
     </group>

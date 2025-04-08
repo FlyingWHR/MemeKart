@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from 'three';
 
-export const Particles1 = ({ turboColor, scale, ...props }) => {
+export const Particles1 = ({ scale = 1, turboColor = 0xffffff }) => {
   const ref = useRef();
   const velocity = useRef({
     x: -Math.random() * 0.05,
@@ -12,6 +12,7 @@ export const Particles1 = ({ turboColor, scale, ...props }) => {
   const gravity = -0.003;
   
   useFrame((state, delta) => {
+    if (turboColor === 0xffffff) return;
     let position = ref.current.position;
     let velocityVector = new THREE.Vector3(velocity.current.x, velocity.current.y, velocity.current.z);
   

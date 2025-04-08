@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { Canvas, useLoader, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-export const PointParticle = ({ position, png, turboColor }) => {
+export const PointParticle = ({
+  position = [0, 0, 0],
+  png = "./particles/circle.png",
+  fireColor = 0xffffff,
+}) => {
   const texture = useLoader(THREE.TextureLoader, png);
   const pointsRef = useRef();
   const materialRef = useRef();
@@ -24,10 +28,10 @@ export const PointParticle = ({ position, png, turboColor }) => {
     }
     setSize(0);
     setOpacity(1);
-  }, [turboColor]);
+  }, [fireColor]);
 
   useFrame((_, delta) => {
-    if (turboColor === 0xffffff) return;
+    if (fireColor === 0xffffff) return;
     if (size < 5) {
       setSize((size) => Math.min(size + 0.3 * delta * 144, 5));
     } else if (opacity > 0) {
@@ -44,7 +48,7 @@ export const PointParticle = ({ position, png, turboColor }) => {
         alphaMap={texture}
         transparent={true}
         depthWrite={false}
-        color={turboColor}
+        color={fireColor}
         opacity={opacity}
         toneMapped={false}
       />
