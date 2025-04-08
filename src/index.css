@@ -705,8 +705,8 @@ body::-webkit-scrollbar {
   align-items: center;
   color: var(--color-text-primary);
   box-sizing: border-box;
-  overflow-y: auto;
-  max-height: 90vh;
+  overflow: hidden;
+  max-height: 100vh;
   margin: 0 auto;
   background-color: var(--color-bg-primary);
   border-radius: var(--radius-lg);
@@ -785,28 +785,32 @@ body::-webkit-scrollbar {
     flex-direction: column;
     align-items: center;
     gap: 30px;
+    overflow: hidden;
   }
-  
+
   .character-preview {
     flex: 0 0 auto;
-    width: 420px; /* Keep fixed width */
-    max-width: 100%; /* Allow scaling down on smaller screens */
+    width: 420px;
+    max-width: 100%;
     margin-bottom: 20px;
     margin-left: 0;
     margin-top: 0;
+    overflow: hidden;
   }
   
   .character-selection-right {
     max-width: 100%;
+    overflow: hidden;
   }
   
   .character-preview-model {
-    height: 315px; /* Changed from 420px to 315px for 4:3 ratio */
-    width: 420px; /* Keep consistent width */
-    max-width: 100%; /* Allow scaling down */
-    min-width: auto; /* Remove min-width constraint on small screens */
+    height: 315px;
+    width: 420px;
+    max-width: 100%;
+    min-width: auto;
     margin-left: auto;
     margin-right: auto;
+    overflow: hidden;
   }
 }
 
