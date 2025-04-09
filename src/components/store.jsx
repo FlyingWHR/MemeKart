@@ -45,6 +45,7 @@ export const useStore = create((set, get) => ({
   isRaceFinished: false,
   countdownActive: false,
   kartPlacedOnGround: false,
+  selectionActive: false,
   
   characters: [
     { id: "doge", name: "Doge", speed: 3, acceleration: 3, handling: 3, weight: 3, image: "/images/characters/doge.png" },
@@ -256,6 +257,9 @@ export const useStore = create((set, get) => ({
       set({ countdownActive: false });
       set(state => ({ raceTime: 0 }));
       console.log("Race timer reset");
+    },
+    setSelectionActive: (active) => {
+      set({ selectionActive: active });
     }
   }
 }));

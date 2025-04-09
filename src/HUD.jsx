@@ -3,6 +3,9 @@ import { useStore } from "./components/store";
 import { Joystick } from "react-joystick-component";
 import "./CountdownStyles.css";
 
+// Add a DEBUG flag at the top of the file
+const DEBUG = false; // Set to true to enable debug logging
+
 // Helper function to format time
 const formatTime = (timeInSeconds) => {
   const minutes = Math.floor(timeInSeconds / 60).toString().padStart(2, '0');
@@ -18,25 +21,26 @@ const CountdownOverlay = () => {
   const [goVisible, setGoVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [showNumber, setShowNumber] = useState(false);
   const countdownSound = useRef(null);
   const startSound = useRef(null);
   const overlayRef = useRef(null);
   
-  // Log when component renders
-  console.log("CountdownOverlay render state:", { countdownActive, countdown, goVisible, isFadingOut, isVisible });
-  
   // Initialize sound refs
   useEffect(() => {
-    console.log("Initializing countdown sounds");
-    countdownSound.current = new Audio('./sounds/jump.mp3');
-    startSound.current = new Audio('./sounds/turbo.wav');
+    if (DEBUG) console.log("Initializing countdown sounds");
+    
+    if (typeof window !== 'undefined') {
+      countdownSound.current = new Audio('./sounds/jump.mp3');
+      startSound.current = new Audio('./sounds/turbo.wav');
+    }
     
     return () => {
-      if (countdownSound.current) {
+      if (countdownSound.current && typeof countdownSound.current.pause === 'function') {
         countdownSound.current.pause();
         countdownSound.current = null;
       }
-      if (startSound.current) {
+      if (startSound.current && typeof startSound.current.pause === 'function') {
         startSound.current.pause();
         startSound.current = null;
       }
@@ -46,64 +50,62 @@ const CountdownOverlay = () => {
   // Reset countdown when it becomes active
   useEffect(() => {
     if (countdownActive) {
-      console.log("Countdown became active - setting to 3");
+      // Show traffic light immediately
       setCountdown(3);
       setGoVisible(false);
       setIsFadingOut(false);
       setIsVisible(true);
+      setShowNumber(false);
+      
+      // Show number after delay and play sound
+      const timer = setTimeout(() => {
+        setShowNumber(true);
+        if (countdownSound.current) {
+          countdownSound.current.currentTime = 0;
+          countdownSound.current.play().catch(e => console.error("Could not play countdown sound:", e));
+        }
+      }, 800);
+      
+      return () => clearTimeout(timer);
     }
   }, [countdownActive]);
   
   // Handle countdown timer logic
   useEffect(() => {
-    console.log("Countdown effect running:", { countdown, active: countdownActive });
-    
     // Exit early if countdown is not active
     if (!countdownActive) return;
     
     // Handle countdown for 3, 2, 1
-    if (countdown > 0) {
-      // Play countdown beep
-      console.log("Playing countdown sound for", countdown);
-      if (countdownSound.current) {
-        countdownSound.current.currentTime = 0;
-        countdownSound.current.play().catch(e => console.error("Could not play countdown sound:", e));
-      }
-      
+    if (countdown > 0 && showNumber) {
       // Set timer for next number
-      console.log("Setting timer for next countdown number");
       const timer = setTimeout(() => {
-        console.log(`Counting down: ${countdown} -> ${countdown - 1}`);
         setCountdown(countdown - 1);
+        if (countdown > 1 && countdownSound.current) {
+          countdownSound.current.currentTime = 0;
+          countdownSound.current.play().catch(e => console.error("Could not play countdown sound:", e));
+        }
       }, 1000);
       
       return () => clearTimeout(timer);
     } 
     // Handle GO! (when countdown === 0)
     else if (countdown === 0 && !goVisible) {
-      console.log("Showing GO!");
       setGoVisible(true);
       
-      // Play start sound
-      console.log("Playing GO! sound");
-      if (startSound.current) {
+      if (startSound.current && typeof startSound.current.play === 'function') {
         startSound.current.currentTime = 0;
         startSound.current.play().catch(e => console.error("Could not play start sound:", e));
       }
       
-      // Immediately unfreeze kart
-      console.log("Unfreezing kart");
       actions.endCountdown();
       
-      // Remove the countdown component after the animation time
       setTimeout(() => {
-        console.log("Removing countdown component after animation");
         setIsVisible(false);
-      }, 500); // Wait just over the 0.4s animation duration
+      }, 500);
       
       return () => {};
     }
-  }, [countdown, countdownActive, actions, goVisible]);
+  }, [countdown, countdownActive, actions, goVisible, showNumber]);
   
   // Don't render if not visible
   if (!isVisible && !countdownActive) {
@@ -133,13 +135,15 @@ const CountdownOverlay = () => {
         </div>
       </div>
       
-      <div 
-        key={countdown} 
-        className={`countdown-number ${countdown === 0 || goVisible ? 'go-text' : ''}`}
-        data-testid="countdown-number"
-      >
-        {countdown === 0 ? "GO!" : countdown}
-      </div>
+      {showNumber && (
+        <div 
+          key={countdown} 
+          className={`countdown-number ${countdown === 0 || goVisible ? 'go-text' : ''}`}
+          data-testid="countdown-number"
+        >
+          {countdown === 0 ? "GO!" : countdown}
+        </div>
+      )}
     </div>
   );
 };
@@ -147,6 +151,7 @@ const CountdownOverlay = () => {
 export const HUD = () => {
   const wheel = useRef();
   const [image, setImage] = useState("");
+  
   const { 
     item, 
     gameStarted, 
@@ -231,7 +236,15 @@ export const HUD = () => {
           </div>
           
           <div className="speed-display">
-            <div className="speed-value" data-testid="speed-value">{currentSpeed}</div>
+            <div 
+              className="speed-value" 
+              data-testid="speed-value"
+              style={{ 
+                transition: "all 0.3s ease-out" 
+              }}
+            >
+              {Math.round(currentSpeed)}
+            </div>
             <div className="speed-unit" data-testid="speed-unit">KM/H</div>
           </div>
           

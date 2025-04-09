@@ -26,6 +26,8 @@ import { geometry } from "maath";
 import { getVehicleStatsForCharacter } from "../config/vehicleStats";
 extend(geometry);
 
+const DEBUG = false; // Set to true to enable debug logging
+
 export const PlayerController = ({
   player,
   userPlayer,
@@ -48,6 +50,9 @@ export const PlayerController = ({
   const body = useRef();
   const kart = useRef();
   const cam = useRef();
+  
+  // Add Rapier world reference to access collision events
+  const { world } = useRapier();
   
   // Get the selected character from the store
   const { actions, shouldSlowDown, item, bananas, coins, id, controls, selectedCharacter } = useStore();
@@ -90,7 +95,7 @@ export const PlayerController = ({
   const blueTurboThreshold = 10;
   const orangeTurboThreshold = 30;
   const purpleTurboThreshold = 60;
-  const [turboColor, setTurboColor] = useState(0xffffff);
+  const [fireColor, setFireColor] = useState(0xffffff);
   const boostDuration = useRef(0);
   const [isBoosting, setIsBoosting] = useState(false);
   let targetXPosition = 0;
@@ -111,11 +116,17 @@ export const PlayerController = ({
   const [shouldLaunch, setShouldLaunch] = useState(false);
   const effectiveBoost = useRef(0);
   const text = useRef();
-
+  
   const slowDownDuration = useRef(1500);
 
   const rightWheel = useRef();
   const leftWheel = useRef();
+  
+  // Add recovery states for wall collision
+  const [wallCollisionRecovery, setWallCollisionRecovery] = useState(0);
+  const maxSpeedAfterCollision = useRef(maxSpeed);
+  const [lastCollisionTime, setLastCollisionTime] = useState(0);
+  const hasCollided = useRef(false);
   
   useEffect(() => {
     if (leftWheel.current && rightWheel.current && body.current) {
@@ -146,10 +157,30 @@ export const PlayerController = ({
     jumpSound.current.setVolume(0.5);
     driftSound.current.setVolume(0.2);
 
-    // Update speed for display - using the rawSpeed for calculation
-    // Convert to km/h and ensure it's positive for display
-    // Only update value in the store, not the local currentSpeed variable
-    const displaySpeed = Math.round(Math.abs(currentSpeed) * 3.6);
+    // Calculate the actual speed based on physical movement, not just wheel spin
+    // Get the actual velocity of the kart from the physics body
+    const actualVelocity = body.current.linvel();
+    const actualSpeedVector = new THREE.Vector3(actualVelocity.x, 0, actualVelocity.z);
+    // Calculate the magnitude of the velocity (actual speed)
+    const actualSpeed = actualSpeedVector.length();
+    
+    // Handle wall collision recovery
+    if (wallCollisionRecovery > 0) {
+      // Decrease recovery timer
+      setWallCollisionRecovery(wallCollisionRecovery - delta);
+      
+      // Gradually increase max speed back to normal
+      const recoveryProgress = 1 - (wallCollisionRecovery / 2); // 2 seconds total recovery
+      maxSpeedAfterCollision.current = maxSpeed * (0.5 + (0.5 * recoveryProgress));
+    } else if (wallCollisionRecovery <= 0 && maxSpeedAfterCollision.current < maxSpeed) {
+      // Reset when recovery is complete
+      maxSpeedAfterCollision.current = maxSpeed;
+      setWallCollisionRecovery(0);
+    }
+    
+    // Update speed without debouncing - let the HUD handle display rate limiting
+    // Convert to km/h and update display
+    const displaySpeed = Math.round(actualSpeed * 3.6);
     actions.setCurrentSpeed(displaySpeed);
 
     driftBlueSound.current.setVolume(0.5);
@@ -213,18 +244,20 @@ export const PlayerController = ({
     // ACCELERATING
     const shouldSlow = actions.getShouldSlowDown();
 
-    if (upPressed && currentSpeed < maxSpeed) {
-      // Accelerate the kart within the maximum speed limit
-      setCurrentSpeed(
-        Math.min(currentSpeed + acceleration * delta * 144, maxSpeed)
-      );
+    if (upPressed && currentSpeed < maxSpeedAfterCollision.current) {
+      // Use the potentially reduced max speed if in recovery
+      if (!countdownFreeze) {
+        setCurrentSpeed(
+          Math.min(currentSpeed + acceleration * delta * 144, maxSpeedAfterCollision.current)
+        );
+      }
     } else if (
       upPressed &&
-      currentSpeed > maxSpeed &&
+      currentSpeed > maxSpeedAfterCollision.current &&
       effectiveBoost.current > 0
     ) {
       setCurrentSpeed(
-        Math.max(currentSpeed - decceleration * delta * 144, maxSpeed)
+        Math.max(currentSpeed - decceleration * delta * 144, maxSpeedAfterCollision.current)
       );
     }
 
@@ -328,29 +361,54 @@ export const PlayerController = ({
     }
     if (!jumpPressed) {
       jumpIsHeld.current = false;
-      driftDirection.current = 0;
-      driftForce.current = 0;
+    }
+    
+    // DRIFTING - Using classic Mario Kart style drift logic
+    // Start drift when jumping and steering
+    if (jumpIsHeld.current && upPressed && Math.abs(pointer.x) > 0.1) {
+      if (pointer.x < -0.1 && !driftRight.current) {
+        driftLeft.current = true;
+        
+        // Set initial scale for particles when drift starts
+        const oscillation = Math.sin(time * 1000) * 0.1;
+        const vibration = oscillation + 0.9;
+        setScale(vibration * 0.8);
+        
+        // Start drift sound if needed
+        if (!driftSound.current.isPlaying) {
+          driftSound.current.play();
+        }
+      }
+      if (pointer.x > 0.1 && !driftLeft.current) {
+        driftRight.current = true;
+        
+        // Set initial scale for particles when drift starts
+        const oscillation = Math.sin(time * 1000) * 0.1;
+        const vibration = oscillation + 0.9;
+        setScale(vibration * 0.8);
+        
+        // Start drift sound if needed
+        if (!driftSound.current.isPlaying) {
+          driftSound.current.play();
+        }
+      }
+    }
+    
+    // End drift only when releasing the jump button
+    if (!jumpIsHeld.current) {
+      // When drift ends, if we've accumulated enough power, apply boost
+      if ((driftLeft.current || driftRight.current) && accumulatedDriftPower.current > 1) {
+        // Drift released - apply boost based on accumulated power
+        setIsBoosting(true);
+        effectiveBoost.current = boostDuration.current;
+        boostDuration.current = 0;
+      }
+      
+      // Reset drift state
       driftLeft.current = false;
       driftRight.current = false;
-    }
-    // DRIFTING
-    if (
-      jumpIsHeld.current &&
-      currentSteeringSpeed > 0 &&
-      upPressed &&
-      pointer.x < -0.1 &&
-      !driftRight.current
-    ) {
-      driftLeft.current = true;
-    }
-    if (
-      jumpIsHeld.current &&
-      currentSteeringSpeed > 0 &&
-      upPressed &&
-      pointer.x > 0.1 &&
-      !driftLeft.current
-    ) {
-      driftRight.current = true;
+      driftDirection.current = 0;
+      driftForce.current = 0;
     }
 
     if (!jumpIsHeld.current && !driftLeft.current && !driftRight.current) {
@@ -359,7 +417,7 @@ export const PlayerController = ({
         0,
         0.0001 * delta * 144
       );
-      setTurboColor(0xffffff);
+      setFireColor(0xffffff);
       accumulatedDriftPower.current = 0;
       driftSound.current.stop();
       driftTwoSound.current.stop();
@@ -410,18 +468,18 @@ export const PlayerController = ({
       }
     }
     if (accumulatedDriftPower.current > blueTurboThreshold) {
-      setTurboColor(0x00ffff);
+      setFireColor(0x00ffff);
       boostDuration.current = 50;
       driftBlueSound.current.play();
     }
     if (accumulatedDriftPower.current > orangeTurboThreshold) {
-      setTurboColor(0xffcf00);
+      setFireColor(0xffcf00);
       boostDuration.current = 100;
       driftBlueSound.current.stop();
       driftOrangeSound.current.play();
     }
     if (accumulatedDriftPower.current > purpleTurboThreshold) {
-      setTurboColor(0xff00ff);
+      setFireColor(0xff00ff);
       boostDuration.current = 250;
       driftOrangeSound.current.stop();
       driftPurpleSound.current.play();
@@ -430,7 +488,7 @@ export const PlayerController = ({
     if (driftLeft.current || driftRight.current) {
       const oscillation = Math.sin(time * 1000) * 0.1;
       const vibration = oscillation + 0.9;
-      if (turboColor === 0xffffff) {
+      if (fireColor === 0xffffff) {
         setScale(vibration * 0.8);
       } else {
         setScale(vibration);
@@ -483,6 +541,57 @@ export const PlayerController = ({
       0.01 * delta * 144
     );
 
+    // RESTORE VELOCITY-BASED WALL DETECTION alongside Rapier physics
+    // This is a backup method in case the collision events don't work properly
+    if (!hasCollided.current && wallCollisionRecovery <= 0) {
+      const speedRatio = actualSpeed / (Math.abs(currentSpeed) + 0.01); // Avoid division by zero
+      const isAgainstWall = (speedRatio < 0.6 && Math.abs(currentSpeed) > 5) || 
+                           (Math.abs(actualSpeed) < 0.8 && Math.abs(currentSpeed) > 6);
+      
+      // Don't detect wall collisions during drift to avoid interfering with drift mechanics
+      if (isAgainstWall && !(driftLeft.current || driftRight.current)) {
+        if (DEBUG) console.log("Velocity-based wall collision detected!");
+        const currentTime = Date.now();
+        if (currentTime - lastCollisionTime > 400) { // Don't process if we collided recently
+          setLastCollisionTime(currentTime);
+          hasCollided.current = true;
+          
+          // Apply bounce-back force
+          const bumpForce = 25 * characterStats.weightMultiplier;
+          body.current.applyImpulse(
+            {
+              x: -forwardDirection.x * bumpForce,
+              y: 0, // No vertical bounce
+              z: -forwardDirection.z * bumpForce,
+            },
+            true
+          );
+          
+          // Apply speed penalty
+          setCurrentSpeed(Math.max(currentSpeed * 0.3, 0)); // Reduce to 30% of current speed
+          maxSpeedAfterCollision.current = maxSpeed * 0.2; // Limit max speed to 20% during recovery
+          setWallCollisionRecovery(3); // 3-second recovery period
+          
+          // Play collision sound
+          if (landingSound.current) {
+            if (landingSound.current.isPlaying) {
+              landingSound.current.stop();
+            }
+            landingSound.current.play();
+            landingSound.current.setVolume(1.0);
+          }
+          
+          // Reset collision state after a delay
+          setTimeout(() => {
+            if (body.current) hasCollided.current = false;
+          }, 400);
+        }
+      }
+    }
+
+    // Instead of the custom wall collision logic, we now rely on Rapier's collision events
+    // The collision detection is handled in onCollisionEnter of the RigidBody
+    
     // Apply movement impulse only if not in countdown
     if (!countdownFreeze) {
       body.current.applyImpulse(
@@ -580,10 +689,84 @@ export const PlayerController = ({
     player.setState("rotation", kartRotation + mario.current.rotation.y);
     player.setState("isBoosting", isBoosting);
     player.setState("shouldLaunch", shouldLaunch);
-    player.setState("turboColor", turboColor);
+    player.setState("fireColor", fireColor);
     player.setState("scale", scale);
     player.setState("bananas", bananas);
   });
+
+  // Function to handle wall collisions
+  const handleWallCollision = (collisionInfo) => {
+    // Only process wall collisions if we're moving fast enough and haven't collided recently
+    if (body.current && !hasCollided.current && player.id === id) {
+      const currentTime = Date.now();
+      if (currentTime - lastCollisionTime < 400) return; // Prevent multiple collisions within 400ms
+      
+      // Skip collision handling during drift to prevent interrupting drift mechanics
+      if (driftLeft.current || driftRight.current) return;
+      
+      // Check if we have significant speed before applying collision effects
+      const actualVelocity = body.current.linvel();
+      const actualSpeedVector = new THREE.Vector3(actualVelocity.x, 0, actualVelocity.z);
+      const actualSpeed = actualSpeedVector.length();
+      
+      // Only apply collision if we're moving at a decent speed
+      if (actualSpeed < 3) return;
+      
+      if (DEBUG) console.log("Wall collision detected! Speed:", actualSpeed);
+      
+      setLastCollisionTime(currentTime);
+      hasCollided.current = true;
+      
+      // Get the collision normal (direction of the impact)
+      const normal = collisionInfo.manifold.normal();
+      
+      // Create a normalized vector from the collision normal
+      const normalVec = new THREE.Vector3(normal.x, normal.y, normal.z).normalize();
+      
+      // Get the forward direction of the kart
+      const kartRotation = kart.current.rotation.y - driftDirection.current * driftForce.current;
+      const forwardDirection = new THREE.Vector3(
+        -Math.sin(kartRotation),
+        0,
+        -Math.cos(kartRotation)
+      );
+      
+      // Calculate the bounce-back force (opposing the direction of movement)
+      const bumpForce = 20 * characterStats.weightMultiplier;
+      
+      // Calculate the dot product to determine how head-on the collision is
+      const dot = forwardDirection.dot(normalVec);
+      
+      // Apply bounce-back force based on the collision normal
+      body.current.applyImpulse(
+        {
+          x: normalVec.x * bumpForce,
+          y: 0, // No vertical bounce
+          z: normalVec.z * bumpForce,
+        },
+        true
+      );
+      
+      // Apply speed penalty
+      setCurrentSpeed(Math.max(currentSpeed * 0.3, 0)); // Reduce to 30% of current speed
+      maxSpeedAfterCollision.current = maxSpeed * 0.2; // Limit max speed to 20% during recovery
+      setWallCollisionRecovery(4); // 4-second recovery period
+      
+      // Play collision sound
+      if (landingSound.current) {
+        if (landingSound.current.isPlaying) {
+          landingSound.current.stop();
+        }
+        landingSound.current.play();
+        landingSound.current.setVolume(1.0);
+      }
+      
+      // Reset collision state after a delay
+      setTimeout(() => {
+        hasCollided.current = false;
+      }, 400);
+    }
+  };
 
   return player.id === id ? (
     <group>
@@ -596,18 +779,29 @@ export const PlayerController = ({
         ccd
         name="player"
         type={player.id === id ? "dynamic" : "kinematic"}
+        onCollisionEnter={(collisionInfo) => {
+          // Ground detection
+          if (collisionInfo.target.translation().y < body.current.translation().y - 0.3) {
+            isOnFloor.current = true;
+            setIsOnGround(true);
+          } 
+          // Wall detection - consider any collision that's not at the bottom to be a wall
+          else {
+            if (DEBUG) console.log("Potential wall collision detected");
+            handleWallCollision(collisionInfo);
+          }
+        }}
+        onCollisionExit={(collisionInfo) => {
+          // Only change ground state if we're exiting what we consider to be ground
+          if (collisionInfo.target.translation().y < body.current.translation().y - 0.3) {
+            isOnFloor.current = false;
+            setIsOnGround(false);
+          }
+        }}
       >
         <BallCollider
           args={[0.5]}
           mass={3}
-          onCollisionEnter={({ other }) => {
-            isOnFloor.current = true;
-            setIsOnGround(true);
-          }}
-          onCollisionExit={({ other }) => {
-            isOnFloor.current = false;
-            setIsOnGround(false);
-          }}
         />
       </RigidBody>
 
@@ -624,7 +818,7 @@ export const PlayerController = ({
           <mesh position={[0.6, 0.05, 0.5]} scale={scale}>
             <sphereGeometry args={[0.05, 16, 16]} />
             <meshStandardMaterial
-              emissive={turboColor}
+              emissive={fireColor}
               toneMapped={false}
               emissiveIntensity={100}
               transparent
@@ -636,14 +830,14 @@ export const PlayerController = ({
             <FakeGlowMaterial
               falloff={3}
               glowInternalRadius={1}
-              glowColor={turboColor}
+              glowColor={fireColor}
               glowSharpness={1}
             />
           </mesh>
           <mesh position={[-0.6, 0.05, 0.5]} scale={scale}>
             <sphereGeometry args={[0.05, 16, 16]} />
             <meshStandardMaterial
-              emissive={turboColor}
+              emissive={fireColor}
               toneMapped={false}
               emissiveIntensity={100}
               transparent
@@ -657,13 +851,13 @@ export const PlayerController = ({
             <FakeGlowMaterial
               falloff={3}
               glowInternalRadius={1}
-              glowColor={turboColor}
+              glowColor={fireColor}
               glowSharpness={1}
             />
           </mesh>
           {/* <FlameParticles isBoosting={isBoosting} /> */}
-          <DriftParticlesLeft turboColor={turboColor} scale={scale} />
-          <DriftParticlesRight turboColor={turboColor} scale={scale} />
+          <DriftParticlesLeft fireColor={fireColor} scale={scale} />
+          <DriftParticlesRight fireColor={fireColor} scale={scale} />
           <SmokeParticles
             driftRight={driftRight.current}
             driftLeft={driftLeft.current}
@@ -671,22 +865,22 @@ export const PlayerController = ({
           <PointParticle
             position={[-0.6, 0.05, 0.5]}
             png="./particles/circle.png"
-            turboColor={turboColor}
+            fireColor={fireColor}
           />
           <PointParticle
             position={[0.6, 0.05, 0.5]}
             png="./particles/circle.png"
-            turboColor={turboColor}
+            fireColor={fireColor}
           />
           <PointParticle
             position={[-0.6, 0.05, 0.5]}
             png="./particles/star.png"
-            turboColor={turboColor}
+            fireColor={fireColor}
           />
           <PointParticle
             position={[0.6, 0.05, 0.5]}
             png="./particles/star.png"
-            turboColor={turboColor}
+            fireColor={fireColor}
           />
           <HitParticles shouldLaunch={shouldLaunch} />
         </group>

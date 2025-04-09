@@ -2,7 +2,10 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from 'three';
 
-export const Particles1 = ({ scale = 1, turboColor = 0xffffff }) => {
+export const Particles1 = ({ scale = 1, fireColor = 0xffffff }) => {
+  // Don't render anything when the fireColor is white
+  if (fireColor === 0xffffff) return null;
+
   const ref = useRef();
   const velocity = useRef({
     x: -Math.random() * 0.05,
@@ -12,7 +15,9 @@ export const Particles1 = ({ scale = 1, turboColor = 0xffffff }) => {
   const gravity = -0.003;
   
   useFrame((state, delta) => {
-    if (turboColor === 0xffffff) return;
+    // Add check for ref.current
+    if (!ref.current) return;
+    
     let position = ref.current.position;
     let velocityVector = new THREE.Vector3(velocity.current.x, velocity.current.y, velocity.current.z);
   
@@ -47,7 +52,7 @@ export const Particles1 = ({ scale = 1, turboColor = 0xffffff }) => {
     <mesh ref={ref} position={[-0.6, 0.05, 0.5]} scale={[scale, scale * 5, scale]}>
       <sphereGeometry args={[0.01, 16, 16]} />
       <meshStandardMaterial
-        emissive={turboColor}
+        emissive={fireColor}
         toneMapped={false}
         emissiveIntensity={5}
       />

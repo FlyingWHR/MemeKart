@@ -11,18 +11,32 @@ import FakeFlame from '../../ShaderMaterials/FakeFlame/FakeFlame'
 import { useStore } from '../../store'
 import gsap from 'gsap'
 
-export function Mario({ currentSpeed, steeringAngleWheels, isBoosting, shouldLaunch, ...props }) {
+export function Mario({ currentSpeed, steeringAngleWheels, isBoosting, shouldLaunch, boostDuration = 50, ...props }) {
   const { nodes, materials } = useGLTF('./models/characters/mariokarttest.glb')
 
   const frontLeftWheel = useRef()
   const frontRightWheel = useRef()
   const rearWheels = useRef()
   const frontWheels = useRef()
-  const [scale, setScale] = React.useState(1)
+  const [scale, setScale] = React.useState(0)
   const { actions } = useStore()
   const [shouldSlow, setShouldSlow] = React.useState(false)
   const mario = useRef();
-  // isBoosting = true;
+  const boostAnimationSpeed = useRef(0.05)
+  
+  // Calculate animation speeds to match the boost durations
+  useEffect(() => {
+    if (boostDuration === 250) {
+      // For the longest boost (250), use slower animation to match duration
+      boostAnimationSpeed.current = 0.025
+    } else if (boostDuration === 100) {
+      // For medium boost (100), use medium animation speed
+      boostAnimationSpeed.current = 0.05
+    } else {
+      // For short boost (50), use faster animation
+      boostAnimationSpeed.current = 0.1
+    }
+  }, [boostDuration])
 
   useFrame((_,delta) => {
     const rotation = currentSpeed / 100
@@ -30,11 +44,15 @@ export function Mario({ currentSpeed, steeringAngleWheels, isBoosting, shouldLau
     frontRightWheel.current.rotation.x += rotation
     rearWheels.current.rotation.x += rotation
     frontWheels.current.rotation.y = steeringAngleWheels
+    
     if (isBoosting){
-      setScale(Math.min(scale + 0.05 * 144 * delta, 1))
+      // Use the calculated animation speed based on boost duration
+      setScale(Math.min(scale + boostAnimationSpeed.current * 144 * delta, 1))
     } else {
-      setScale(Math.max(scale - 0.03 * 144 * delta, 0))
+      // Fade out animation at a consistent rate
+      setScale(Math.max(scale - 0.06 * 144 * delta, 0))
     }
+    
     setShouldSlow(actions.getShouldSlowDown());
   })
 

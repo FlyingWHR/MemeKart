@@ -39,7 +39,7 @@ import {
 } from "playroomkit";
 import { PlayerDummies } from "./PlayerDummies";
 import { useEffect, useState, useRef, forwardRef } from "react";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useFrame, useThree, useLoader } from "@react-three/fiber";
 import { LUTPass, LUTCubeLoader } from "three-stdlib";
 import { useCurvedPathPoints } from "./useCurvedPath";
 import { ParisBis } from "./models/tracks/Paris-bis";
@@ -92,7 +92,8 @@ export const Experience = () => {
     totalLaps,
     isRaceFinished,
     countdownActive,
-    kartPlacedOnGround
+    kartPlacedOnGround,
+    selectionActive
   } = useStore();
   const [networkBananas, setNetworkBananas] = useMultiplayerState(
     "bananas",
@@ -120,19 +121,38 @@ export const Experience = () => {
   // Add a ref to track when the kart is initially positioned
   const kartPositioned = useRef(false);
   
+  // Get the renderer from the Three.js context
+  const { gl } = useThree();
+  
+  // Set up reduced frame rate during character selection
   useEffect(() => {
-    // Allow toggling checkpoint visibility for debugging
-    const handleKeyDown = (e) => {
-      if (e.key === 'c') {
-        setShowCheckpoints(prev => !prev);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
+    if (selectionActive) {
+      // If in selection mode, reduce frame rate to 10 fps to save resources
+      const originalSetAnimationLoop = gl.setAnimationLoop;
+      let lastTime = 0;
+      const interval = 1000 / 10; // 10 fps
+      
+      const throttledLoop = (callback) => {
+        gl.setAnimationLoop((time) => {
+          if (time - lastTime >= interval) {
+            lastTime = time;
+            if (callback) callback(time);
+          }
+        });
+      };
+      
+      // Store original animation loop function
+      const originalAnimationLoop = gl._animationLoop;
+      
+      // Apply throttled loop
+      throttledLoop(originalAnimationLoop);
+      
+      // Restore original animation loop when selection ends
+      return () => {
+        gl.setAnimationLoop(originalAnimationLoop);
+      };
+    }
+  }, [selectionActive, gl]);
 
   useEffect(() => {
     if (points) {
@@ -316,6 +336,20 @@ export const Experience = () => {
       }
     }
   }, [gameStarted, players, id, kartPlacedOnGround, actions]);
+
+  // Allow toggling checkpoint visibility for debugging
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'c') {
+        setShowCheckpoints(prev => !prev);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   return (
     <>

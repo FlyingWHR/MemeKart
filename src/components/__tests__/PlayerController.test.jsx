@@ -34,7 +34,7 @@ describe('PlayerController', () => {
         controlType: 'keyboard',
         playerKart: {
           id: 'player1',
-          position: { x: 0, y: 0, z: 0 },
+      position: { x: 0, y: 0, z: 0 },
           rotation: { x: 0, y: 0, z: 0 },
           speed: 15,
           maxSpeed: 30,
@@ -57,7 +57,7 @@ describe('PlayerController', () => {
       return state;
     });
   });
-  
+
   it('should render properly', () => {
     const { getByTestId } = render(<PlayerController />);
     expect(getByTestId('mocked-player-controller')).toBeTruthy();
@@ -115,4 +115,4 @@ describe('PlayerController', () => {
     render(<PlayerController />);
     expect(PlayerController).toHaveBeenCalled();
   });
-});
+}); 

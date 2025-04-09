@@ -26,6 +26,20 @@ import { ItemParticles } from "./Particles/items/ItemParticles";
 import { geometry } from "maath";
 extend(geometry);
 
+const DEBUG = false; // Set to true to enable debug logging
+
+const WHEEL_ROTATION_SPEED = 0.1; // Base rotation speed
+const MAX_WHEEL_ANGLE = 30; // Maximum steering angle in degrees
+const WHEEL_SMOOTHNESS = 0.2; // Smoothness factor for steering
+
+// Camera improvements
+const CAMERA_SMOOTHNESS = 0.02;
+const CAMERA_MOMENTUM = 0.05;
+const BASE_FOV = 50;
+const TURN_FOV = 52;
+const BOOST_FOV = 55;
+const CAMERA_TILT = 0.05;
+
 export const PlayerControllerKeyboard = ({
   player,
   userPlayer,
@@ -115,10 +129,13 @@ export const PlayerControllerKeyboard = ({
   
   // Boost system variables
   const boostForce = useRef(0);        // Current force being applied for boost
-  const maxBoostForce = 200;           // Maximum boost force to apply
-  const boostRampUpRate = 500;         // How quickly boost increases
+  const maxBoostForce = 300;           // Maximum boost force to apply (increased from 200)
+  const boostRampUpRate = 1000;        // How quickly boost increases (increased from 500)
   const boostDecayRate = 200;          // How quickly boost decreases
   
+  // Add camera velocity ref
+  const cameraVelocity = useRef(new THREE.Vector3());
+
   useEffect(() => {
     if (leftWheel.current && rightWheel.current && body.current) {
       actions.setLeftWheel(leftWheel.current);
@@ -180,30 +197,28 @@ export const PlayerControllerKeyboard = ({
       actions.setGameStarted(false);
     }
 
-    // Calculate steering input, but only apply rotation if not in countdown
-    if (leftPressed && currentSpeed > 0) {
+    // Wheel rotation based on speed
+    const wheelRotation = currentSpeed * WHEEL_ROTATION_SPEED * delta;
+    if (leftWheel.current && rightWheel.current && body.current) {
+      leftWheel.current.rotation.x += wheelRotation;
+      rightWheel.current.rotation.x += wheelRotation;
+    }
+
+    // Steering angle directly tied to input
+    if (leftPressed) {
       steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
-    } else if (rightPressed && currentSpeed > 0) {
+      // Set wheel angle directly based on input
+      setSteeringAngleWheels(MAX_WHEEL_ANGLE);
+    } else if (rightPressed) {
       steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
-    } else if (rightPressed && currentSpeed < 0) {
-      steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
-      targetXPosition = -camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
-    } else if (leftPressed && currentSpeed < 0) {
-      steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
-      targetXPosition = camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
+      // Set wheel angle directly based on input
+      setSteeringAngleWheels(-MAX_WHEEL_ANGLE);
     } else {
       steeringAngle = 0;
       targetXPosition = 0;
+      // Reset wheel angle when no input
       setSteeringAngleWheels(0);
     }
 
@@ -324,14 +339,9 @@ export const PlayerControllerKeyboard = ({
       bodyPosition.z
     );
 
-    // Log ground state for debugging
-    if (jumpPressed) {
-      console.log("Ground state:", { isOnGround, isOnFloor: isOnFloor.current, jumpIsHeld: jumpIsHeld.current });
-    }
-
     // JUMPING
     if (jumpPressed && isOnGround && !jumpIsHeld.current) {
-      console.log("Jump initiated with space bar");
+      if (DEBUG) console.log("Jump initiated with space bar");
       jumpForce.current += 10; // Increment instead of setting directly, as in original
       isOnFloor.current = false;
       jumpIsHeld.current = true;
@@ -362,29 +372,37 @@ export const PlayerControllerKeyboard = ({
     
     // DRIFTING
     if (jumpPressed && upPressed && (leftPressed || rightPressed) && !isDrifting.current) {
-      console.log("Checking drift conditions:", { jumpPressed, leftPressed, rightPressed });
+      if (DEBUG) console.log("Checking drift conditions:", { jumpPressed, leftPressed, rightPressed });
       
       if (leftPressed) {
-        console.log("Starting left drift");
+        if (DEBUG) console.log("Starting left drift");
         driftLeft.current = true;
         driftRight.current = false;
         driftDirection.current = 1;
         driftForce.current = 0.4;
         isDrifting.current = true;
         
-        // Play drift sound
+        // Set initial scale for particles when drift starts
+        const oscillation = Math.sin(time * 1000) * 0.1;
+        const vibration = oscillation + 0.9;
+        setScale(vibration);
+        
         if (!driftSound.current.isPlaying) {
           driftSound.current.play();
         }
       } else if (rightPressed) {
-        console.log("Starting right drift");
+        if (DEBUG) console.log("Starting right drift");
         driftRight.current = true;
         driftLeft.current = false;
         driftDirection.current = -1;
         driftForce.current = 0.4;
         isDrifting.current = true;
         
-        // Play drift sound
+        // Set initial scale for particles when drift starts
+        const oscillation = Math.sin(time * 1000) * 0.1;
+        const vibration = oscillation + 0.9;
+        setScale(vibration);
+        
         if (!driftSound.current.isPlaying) {
           driftSound.current.play();
         }
@@ -393,13 +411,13 @@ export const PlayerControllerKeyboard = ({
     
     // End drift when jump button is released
     if (!jumpPressed && isDrifting.current) {
-      console.log("Ending drift");
+      if (DEBUG) console.log("Ending drift");
       isDrifting.current = false;
       
       // Apply boost if accumulated enough power
       // Only apply boost if we've reached at least the small fire threshold
       if (accumulatedDriftPower.current >= smallFireThreshold) {
-        console.log("Applying boost with power:", accumulatedDriftPower.current);
+        if (DEBUG) console.log("Applying boost with power:", accumulatedDriftPower.current);
         setIsBoosting(true);
         
         // Set boost duration based on drift power
@@ -452,7 +470,6 @@ export const PlayerControllerKeyboard = ({
       if (isOnFloor.current) {
         leftWheel.current.isSpinning = true;
         accumulatedDriftPower.current += 0.1 * (steeringAngle + 1) * delta * 144;
-        console.log("Accumulating left drift power:", accumulatedDriftPower.current);
       }
     }
     
@@ -467,7 +484,6 @@ export const PlayerControllerKeyboard = ({
       if (isOnFloor.current) {
         leftWheel.current.isSpinning = true;
         accumulatedDriftPower.current += 0.1 * (-steeringAngle + 1) * delta * 144;
-        console.log("Accumulating right drift power:", accumulatedDriftPower.current);
       }
     }
     if (!driftLeft.current && !driftRight.current) {
@@ -527,8 +543,14 @@ export const PlayerControllerKeyboard = ({
       // Apply gradual speed reduction during drifting
       // The reduction is small to maintain gameplay fun while adding realism
       if (isOnFloor.current && currentSpeed > 5) {
-        // Reduce speed by a very small percentage each frame
-        const driftSpeedReductionFactor = 0.9995; // Lose 0.05% speed per frame (tiny reduction)
+        // Calculate steering intensity based on steeringAngle (max reduction at full turn)
+        const steeringIntensity = Math.abs(steeringAngle) / MaxSteeringSpeed; // 0 to 1 value
+        
+        // Base reduction plus additional based on steering intensity
+        // 0.999 (0.1% loss) at minimum steering, up to 0.998 (0.2% loss) at maximum steering
+        const driftSpeedReductionFactor = 1 - (0.001 + (0.001 * steeringIntensity));
+        
+        // Apply the calculated reduction
         setCurrentSpeed(currentSpeed * driftSpeedReductionFactor);
       }
     } else {
@@ -620,17 +642,32 @@ export const PlayerControllerKeyboard = ({
 
     cam.current.updateMatrixWorld();
 
-    cam.current.position.x = THREE.MathUtils.lerp(
-      cam.current.position.x,
-      targetXPosition,
-      0.01 * delta * 144
+    // Calculate target position with momentum
+    const targetPosition = new THREE.Vector3(
+      targetXPosition * 0.5,
+      2,
+      targetZPosition
     );
 
-    cam.current.position.z = THREE.MathUtils.lerp(
-      cam.current.position.z,
-      targetZPosition,
-      0.01 * delta * 144
+    // Add momentum to camera movement
+    cameraVelocity.current.lerp(
+      targetPosition.sub(cam.current.position).multiplyScalar(CAMERA_SMOOTHNESS),
+      CAMERA_MOMENTUM
     );
+
+    // Apply velocity to camera position
+    cam.current.position.add(cameraVelocity.current);
+
+    // Dynamic FOV - more gradual changes
+    const targetFOV = isBoosting ? BOOST_FOV : 
+                     Math.abs(steeringAngle) > 0.2 ? TURN_FOV :
+                     BASE_FOV;
+    cam.current.fov += (targetFOV - cam.current.fov) * 0.05;
+    cam.current.updateProjectionMatrix();
+
+    // Camera tilt during turns - more subtle
+    const tiltAmount = steeringAngle * CAMERA_TILT;
+    cam.current.rotation.z = -tiltAmount;
 
     // RESTORE VELOCITY-BASED WALL DETECTION as the main method
     // This is used now that we've reverted to simpler collision detection for ground
@@ -640,7 +677,7 @@ export const PlayerControllerKeyboard = ({
                            (Math.abs(actualSpeed) < 0.8 && Math.abs(currentSpeed) > 6);
       
       if (isAgainstWall) {
-        console.log("Wall collision detected!");
+        if (DEBUG) console.log("Wall collision detected!");
         const currentTime = Date.now();
         if (currentTime - lastCollisionTime > 400) { // Don't process if we collided recently
           setLastCollisionTime(currentTime);
@@ -737,10 +774,9 @@ export const PlayerControllerKeyboard = ({
       const newBanana = {
         id: Math.random() + "-" + +new Date(),
         position: bananaPosition,
-        player: true,
+        player: true
       };
       setNetworkBananas([...networkBananas, newBanana]);
-
       actions.useItem();
     }
 
@@ -784,7 +820,6 @@ export const PlayerControllerKeyboard = ({
   // Function to handle wall collisions - now only used for reference
   const handleWallCollision = () => {
     // Wall collision is now handled by the velocity-based detection
-    console.log("Wall collision function not directly used anymore");
   };
 
   return player.id === id ? (
@@ -803,7 +838,7 @@ export const PlayerControllerKeyboard = ({
           args={[0.5]}
           mass={3}
           onCollisionEnter={({ other }) => {
-            console.log("Ground collision detected");
+            if (DEBUG) console.log("Ground collision detected");
             isOnFloor.current = true;
             setIsOnGround(true);
             
@@ -814,7 +849,7 @@ export const PlayerControllerKeyboard = ({
             }
           }}
           onCollisionExit={({ other }) => {
-            console.log("Leaving ground");
+            if (DEBUG) console.log("Leaving ground");
             isOnFloor.current = false;
             setIsOnGround(false);
           }}
@@ -828,6 +863,7 @@ export const PlayerControllerKeyboard = ({
             steeringAngleWheels={steeringAngleWheels}
             isBoosting={isBoosting}
             shouldLaunch={shouldLaunch}
+            boostDuration={effectiveBoost.current}
           />
           <CoinParticles coins={coins} />
           <ItemParticles item={item} />

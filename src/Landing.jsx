@@ -8,6 +8,14 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 // 3D Model preview component
+const ModelPreloader = () => {
+  // Preload all character models to improve switching experience
+  useGLTF('./models/characters/mariokarttest.glb');
+  
+  // This component doesn't render anything - it just preloads models
+  return null;
+};
+
 const CharacterModel = ({ characterId }) => {
   const modelRef = useRef();
   
@@ -215,6 +223,9 @@ const CharacterSelection = ({ onBack, onSelect }) => {
 
   return (
     <div className="character-selection">
+      {/* Invisible component to preload models */}
+      <ModelPreloader />
+      
       <h2>SELECT YOUR CHARACTER</h2>
       
       <div className="character-selection-content">
@@ -405,6 +416,17 @@ export const Landing = () => {
   // 0: Initial screen with logo and start button
   // 1: Character selection screen - modified to go directly to game after this
 
+  // Set selectionActive based on setupStatus
+  useEffect(() => {
+    // Update selection state when setupStatus changes
+    actions.setSelectionActive(setupStatus === 1);
+    
+    // Clean up when component unmounts
+    return () => {
+      actions.setSelectionActive(false);
+    };
+  }, [setupStatus, actions]);
+
   useEffect(() => {
     const tl = gsap.timeline();
 
@@ -512,6 +534,9 @@ export const Landing = () => {
   };
 
   const handleCharacterSelected = () => {
+    // Signal that selection is ending 
+    actions.setSelectionActive(false);
+    
     // Faster exit animation before starting game
     if (characterSelectionRef.current) {
       gsap.to(characterSelectionRef.current, {

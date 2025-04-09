@@ -15,6 +15,7 @@ export const Controls = {
   down: 'down',
   left: 'left',
   right: 'right',
+  jump: 'jump',
   boost: 'boost',
   shoot: 'shoot',
   slow: 'slow',

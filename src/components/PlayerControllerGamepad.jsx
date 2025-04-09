@@ -25,6 +25,20 @@ import { geometry } from "maath";
 import { useGamepad } from "./useGamepad";
 extend(geometry);
 
+const DEBUG = false; // Set to true to enable debug logging
+
+const WHEEL_ROTATION_SPEED = 0.1; // Base rotation speed
+const MAX_WHEEL_ANGLE = 30; // Maximum steering angle in degrees
+const WHEEL_SMOOTHNESS = 0.2; // Smoothness factor for steering
+
+// Camera improvements
+const CAMERA_SMOOTHNESS = 0.02;
+const CAMERA_MOMENTUM = 0.05;
+const BASE_FOV = 50;
+const TURN_FOV = 52;
+const BOOST_FOV = 55;
+const CAMERA_TILT = 0.05;
+
 export const PlayerControllerGamepad = ({
   player,
   userPlayer,
@@ -108,12 +122,15 @@ export const PlayerControllerGamepad = ({
 
   // Initialize variables for the new physics-based boost system
   const boostForce = useRef(0);
-  const maxBoostForce = 200; // Maximum force applied during boost (reduced from 20000)
-  const boostRampUpRate = 500; // How quickly boost reaches max force (reduced from 10000)
+  const maxBoostForce = 300; // Maximum force applied during boost (increased from 200)
+  const boostRampUpRate = 1000; // How quickly boost reaches max force (increased from 500)
   const boostDecayRate = 200; // How quickly boost fades when complete (reduced from 5000)
   
   // Vector to store the forward direction of the kart
   const forwardDirection = useRef(new THREE.Vector3(0, 0, 1));
+
+  // Add camera velocity ref
+  const cameraVelocity = useRef(new THREE.Vector3());
 
   useEffect(() => {
     if (leftWheel.current && rightWheel.current && body.current) {
@@ -176,6 +193,13 @@ export const PlayerControllerGamepad = ({
     }
     leftWheel.current.kartRotation = kartRotation ;
 
+    // Wheel rotation based on speed
+    const wheelRotation = currentSpeed * WHEEL_ROTATION_SPEED * delta;
+    if (leftWheel.current && rightWheel.current && body.current) {
+      leftWheel.current.rotation.x += wheelRotation;
+      rightWheel.current.rotation.x += wheelRotation;
+    }
+
     // Handle joystick input, but only apply rotation if not in countdown
     if (!driftLeft.current && !driftRight.current) {
       // Store the visual steering for wheels
@@ -183,18 +207,18 @@ export const PlayerControllerGamepad = ({
       // Apply steering only if not in countdown
       steeringAngle = countdownFreeze ? 0 : visualSteering;
       targetXPosition = -camMaxOffset * -joystick[0];
-      // Set wheel visuals always
-      setSteeringAngleWheels(visualSteering * 25);
+      // Set wheel angle directly based on joystick input
+      setSteeringAngleWheels(joystick[0] * MAX_WHEEL_ANGLE);
     } else if (driftLeft.current && !driftRight.current) {
       const visualSteering = currentSteeringSpeed * -(joystick[0] - 1);
       steeringAngle = countdownFreeze ? 0 : visualSteering;
       targetXPosition = -camMaxOffset * -joystick[0];
-      setSteeringAngleWheels(visualSteering * 25);
+      setSteeringAngleWheels(joystick[0] * MAX_WHEEL_ANGLE);
     } else if (driftRight.current && !driftLeft.current) {
       const visualSteering = currentSteeringSpeed * -(joystick[0] + 1);
       steeringAngle = countdownFreeze ? 0 : visualSteering;
       targetXPosition = -camMaxOffset * -joystick[0];
-      setSteeringAngleWheels(visualSteering * 25);
+      setSteeringAngleWheels(joystick[0] * MAX_WHEEL_ANGLE);
     }
     // ACCELERATING
     const shouldSlow = actions.getShouldSlowDown();
@@ -332,7 +356,7 @@ export const PlayerControllerGamepad = ({
     // JUMPING - Separate from drift logic
     // Only initiate a jump when first pressing RB on the ground
     if (RB && onGroundNow && !jumpIsHeld.current) {
-      console.log("Jump initiated");
+      if (DEBUG) console.log("Jump initiated");
       jumpForce.current = 10;
       isOnFloor.current = false;
       jumpIsHeld.current = true;
@@ -356,19 +380,29 @@ export const PlayerControllerGamepad = ({
       // If we just started the jump or we're on the ground
       if (Math.abs(joystick[0]) > 0.1) {
         if (joystick[0] < -0.1) {
-          console.log("Starting left drift");
+          if (DEBUG) console.log("Starting left drift");
           driftLeft.current = true;
           driftRight.current = false;
           driftDirection.current = 1;
           driftForce.current = 0.4;
           isDrifting.current = true;
+          
+          // Set initial scale for particles when drift starts
+          const oscillation = Math.sin(time * 1000) * 0.1;
+          const vibration = oscillation + 0.9;
+          setScale(vibration);
         } else if (joystick[0] > 0.1) {
-          console.log("Starting right drift");
+          if (DEBUG) console.log("Starting right drift");
           driftRight.current = true;
           driftLeft.current = false;
           driftDirection.current = -1;
           driftForce.current = 0.4;
           isDrifting.current = true;
+          
+          // Set initial scale for particles when drift starts
+          const oscillation = Math.sin(time * 1000) * 0.1;
+          const vibration = oscillation + 0.9;
+          setScale(vibration);
         }
         
         // Play drift initiation sound
@@ -390,6 +424,20 @@ export const PlayerControllerGamepad = ({
         } else {
           // Still accumulate some power even if not steering hard
           accumulatedDriftPower.current += 0.05 * delta * 144;
+        }
+        
+        // Apply gradual speed reduction during drifting
+        // The reduction is small to maintain gameplay fun while adding realism
+        if (currentSpeed > 5) {
+          // Calculate steering intensity based on joystick position
+          const steeringIntensity = Math.abs(joystick[0]); // 0 to 1 value from joystick
+          
+          // Base reduction plus additional based on steering intensity
+          // 0.999 (0.1% loss) at minimum steering, up to 0.998 (0.2% loss) at maximum steering
+          const driftSpeedReductionFactor = 1 - (0.001 + (0.001 * steeringIntensity));
+          
+          // Apply the calculated reduction
+          setCurrentSpeed(currentSpeed * driftSpeedReductionFactor);
         }
       }
       
@@ -608,17 +656,32 @@ export const PlayerControllerGamepad = ({
 
     cam.current.updateMatrixWorld();
 
-    cam.current.position.x = THREE.MathUtils.lerp(
-      cam.current.position.x,
+    // Calculate target position with momentum
+    const targetPosition = new THREE.Vector3(
       targetXPosition,
-      0.01 * delta * 144
+      2, // Height
+      targetZPosition
     );
 
-    cam.current.position.z = THREE.MathUtils.lerp(
-      cam.current.position.z,
-      targetZPosition,
-      0.01 * delta * 144
+    // Add momentum to camera movement
+    cameraVelocity.current.lerp(
+      targetPosition.sub(cam.current.position).multiplyScalar(CAMERA_SMOOTHNESS),
+      CAMERA_MOMENTUM
     );
+
+    // Apply velocity to camera position
+    cam.current.position.add(cameraVelocity.current);
+
+    // Dynamic FOV
+    const targetFOV = isBoosting ? BOOST_FOV : 
+                     Math.abs(steeringAngle) > 0.1 ? TURN_FOV : 
+                     BASE_FOV;
+    cam.current.fov += (targetFOV - cam.current.fov) * 0.1;
+    cam.current.updateProjectionMatrix();
+
+    // Camera tilt during turns
+    const tiltAmount = steeringAngle * CAMERA_TILT;
+    cam.current.rotation.z = -tiltAmount;
 
     // RESTORE VELOCITY-BASED WALL DETECTION alongside Rapier physics
     // This is a backup method in case the collision events don't work properly
@@ -629,7 +692,7 @@ export const PlayerControllerGamepad = ({
       
       // IMPORTANT: Never detect wall collisions during drift to avoid breaking drift mechanics
       if (isAgainstWall && !isDrifting.current) {
-        console.log("Velocity-based wall collision detected! Speed ratio:", speedRatio);
+        if (DEBUG) console.log("Velocity-based wall collision detected! Speed ratio:", speedRatio);
         const currentTime = Date.now();
         if (currentTime - lastCollisionTime > 400) { // Don't process if we collided recently
           setLastCollisionTime(currentTime);
@@ -821,8 +884,6 @@ export const PlayerControllerGamepad = ({
       // Calculate the dot product to determine how head-on the collision is
       const dot = forwardDirection.dot(normalVec);
       
-      console.log("Collision dot product:", dot);
-      
       // Apply bounce-back force based on the collision normal
       body.current.applyImpulse(
         {
@@ -873,7 +934,7 @@ export const PlayerControllerGamepad = ({
           } 
           // Wall detection - consider any collision that's not at the bottom to be a wall
           else {
-            console.log("Potential wall collision detected");
+            if (DEBUG) console.log("Potential wall collision detected");
             handleWallCollision(collisionInfo);
           }
         }}
@@ -898,6 +959,7 @@ export const PlayerControllerGamepad = ({
             steeringAngleWheels={steeringAngleWheels}
             isBoosting={isBoosting}
             shouldLaunch={shouldLaunch}
+            boostDuration={effectiveBoost.current}
           />
           <CoinParticles coins={coins} />
           <ItemParticles item={item} />

@@ -1,7 +1,5 @@
 # MemeKart - JavaScript/WebGL Meme Racing Game
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Lunakepio/Mario-Kart-3.js)
-
 ## Game Overview
 
 MemeKart is a web-based racing game inspired by classic kart racing games but featuring internet meme characters and themes. Built with JavaScript, Three.js, and React, it offers fun arcade-style racing with drift mechanics, items, and character-specific stats.
@@ -197,5 +195,39 @@ Contributions are welcome! Feel free to:
 ## License
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+### Key Mechanics
+
+#### Drift System
+The drift system uses a classic Mario Kart approach:
+- Hold jump (Spacebar/RB) while turning to initiate drift
+- Continue holding to accumulate drift power
+- Drift power progresses from blue → orange → purple
+- Release to get a mini-turbo boost of corresponding power
+
+#### Physics
+The game uses Rapier for physics calculations:
+- Realistic collision detection and response
+- Character weight affecting handling and collision
+- Wall bouncing with recovery periods
+- Ground detection via raycasting
+
+#### Character Stats
+Characters have different attributes that affect gameplay:
+- **Speed**: Maximum velocity
+- **Acceleration**: How quickly top speed is reached
+- **Handling**: Turning responsiveness
+- **Weight**: Affects physics and stability
+
+## 🙏 Credits
+
+- Graphics and models inspired by classic kart racers
+- Meme characters used under fair use for parody
+- Sound effects from [source]
+- Built with React and Three.js
+
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
