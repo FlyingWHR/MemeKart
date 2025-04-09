@@ -1,4 +1,4 @@
-# MemeKart Active Context
+# MemeKart Development Status
 
 ## Current Development Focus
 
@@ -11,10 +11,10 @@
 - Improving drift initiation reliability
 
 ### 2. Wall Collision System
-- Implementing velocity-based detection
-- Adding bounce-back forces
-- Managing recovery states
-- Synchronizing audio feedback
+- ✅ Implementing velocity-based detection
+- ✅ Adding bounce-back forces
+- ✅ Managing recovery states
+- ✅ Synchronizing audio feedback
 
 ### 3. Character Balance
 - Adjusting speed multipliers
@@ -22,50 +22,31 @@
 - Balancing weight effects
 - Refining special abilities
 
-## Recent Changes
+## Recent Improvements
 
-### Particle System Improvements (April 2024)
-1. Fixed white particle visibility issues:
-   - Modified `PointParticle` component to only show particles during active drifting
-   - Removed special case for white particles that was making them always visible
-   - Reduced particle size from 0.1 to 0.02 to make them less distracting
-   - Slowed growth rate from delta * 0.5 to delta * 0.2
-   - Reduced maximum particle size from 0.2 to 0.1
+### Camera System (April 2024)
+- Smoother movement with reduced smoothness (0.02) and momentum (0.05)
+- Dynamic FOV adjustments (BASE: 50°, TURN: 52°, BOOST: 55°)
+- Reduced camera tilt (0.05) for less disorienting turns
+- Improved camera positioning and transitions
 
-2. Character Selection UI Improvements:
-   - Fixed scroll bar issue by changing `overflow-y: auto` to `overflow: hidden`
-   - Set `max-height: 100vh` for better screen fit
-   - Added `overflow: hidden` to nested containers to prevent potential scrolling
+### Wheel and Steering (April 2024)
+- Independent wheel rotation and steering
+- Smooth transitions between wheel angles
+- Consistent visual feedback for all steering inputs
+- Enhanced wheel spinning effects
 
-### Drift and Boost System Overhaul (April 2024)
-1. Replaced abstract "turbo" terms with realistic fire terminology
-2. Changed drift effect colors to match real flame temperature progression:
-   - Small fire: Light blue-white (cooler flame)
-   - Medium fire: Warm orange-yellow (medium heat)
-   - Hot fire: Intense red (hottest flame)
-3. Adjusted thresholds for more natural progression:
-   - Small fire threshold: 3 (lowered for quick feedback)
-   - Medium fire threshold: 16 (balanced middle tier)
-   - Hot fire threshold: 35 (challenging but achievable)
-4. Fixed boost force issues:
-   - Reduced max boost force from 20000 to 200 in gamepad controller
-   - Standardized boost values across all controller types
-5. Implemented post-boost phase:
-   - Added gradual speed reduction after boost ends
-   - Top speed limit gradually decreases over time
-   - Smooth transition from boost speed to normal speed
+### Physics and Collision (April 2024)
+- Added wall collision recovery system
+- Enhanced ground detection
+- Physics-based boost mechanics
+- Backup wall detection system
 
-### Wall Collision Improvements
-1. Added velocity-based detection
-2. Implemented recovery system
-3. Enhanced bounce mechanics
-4. Added visual effects
-
-### Control Refinements
-1. Improved keyboard response
-2. Enhanced gamepad support
-3. Refined touch controls
-4. Added control customization
+### Visual Effects (April 2024)
+- Dynamic boost animations based on duration
+- Enhanced drift particle effects
+- Improved wheel spinning visuals
+- Better effect synchronization
 
 ## Current Issues
 
@@ -80,16 +61,68 @@
 3. Mobile device optimization
 4. Memory usage in long sessions
 
+## Development Progress
+
+### Completed Features
+1. Core Mechanics
+   - Basic movement system
+   - Physics integration
+   - Character selection
+   - Drift mechanics
+   - Wall collisions
+   - Item system basics
+
+2. Controls
+   - Keyboard support
+   - Gamepad integration
+   - Touch controls
+   - Control customization
+
+3. Visual Systems
+   - Character models
+   - Basic particle effects
+   - Drift visualization
+   - HUD elements
+
+4. Audio
+   - Engine sounds
+   - Drift effects
+   - Collision sounds
+   - Item sounds
+
+### In Progress
+1. Drift System Refinement
+   - [ ] Consistent activation
+   - [ ] Sound synchronization
+
+2. Wall Collision System
+   - [ ] Reliable detection
+   - [ ] Bounce mechanics
+   - [ ] Recovery system
+   - [ ] Effect polish
+
+3. Performance Optimization
+   - [ ] Physics calculations
+   - [ ] Particle system
+   - [ ] Memory management
+   - [ ] Mobile performance
+
 ## Next Steps
 
 ### Immediate Tasks
-1. Fix remaining drift activation issues
-2. Improve wall collision reliability
-3. Optimize performance
-4. Enhance visual feedback
+1. Continue camera parameter optimization
+2. Refine wheel animation transitions
+3. Enhance collision system
+4. Improve visual effect timing
 
 ### Planned Features
 1. Additional characters
 2. New items
 3. Track variations
-4. Multiplayer improvements 
+4. Multiplayer improvements
+
+## Active Decisions
+- Using physics-based boost system for more realistic acceleration
+- Implementing smooth camera transitions for better gameplay feel
+- Maintaining visual feedback for all player inputs
+- Balancing performance and visual quality 
