@@ -50,6 +50,10 @@ import { useAudioFallback } from "./useAudioFallback";
 import { useErrorTracker } from './ErrorTracker';
 import { SafePositionalAudio } from './SafePositionalAudio';
 import { VehicleStatsDebug } from './VehicleStatsDebug';
+// TrollTrap Imports:
+// import { useStore } from './store'; // Already imported
+import { TrollTrap } from './models/items/TrollTrap'; 
+// import { Suspense } from 'react'; // Already imported
 
 // Define checkpoints - positions around the track
 const checkpoints = [
@@ -105,6 +109,7 @@ export const Experience = () => {
   const [networkShells, setNetworkShells] = useMultiplayerState("shells", []);
   const [pointest, setPointest] = useState([]);
   const [currentPoint, setCurrentPoint] = useState(0);
+  const trollTraps = useStore((state) => state.trollTraps); // Read TrollTraps state
   
   // Player position tracking for checkpoint detection
   const [playerCheckpointState, setPlayerCheckpointState] = useMultiplayerState(
@@ -512,6 +517,20 @@ export const Experience = () => {
       />
 
       <VehicleStatsDebug />
+
+      {/* Render Troll Traps */}
+      {trollTraps.map(trap => (
+        <Suspense fallback={null} key={trap.id}>
+          <TrollTrap 
+            id={trap.id} 
+            position={trap.position} 
+            rotation={trap.rotation} 
+            // player prop is not needed for rendering existing traps
+            // setNetworkTrollTraps and networkTrollTraps are also not needed here
+            // as this component's responsibility is to render based on current store state.
+          />
+        </Suspense>
+      ))}
     </>
   );
 };

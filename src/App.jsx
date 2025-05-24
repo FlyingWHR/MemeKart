@@ -9,6 +9,8 @@ import * as THREE from "three";
 import { CustomLoader } from './components/CustomLoader'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ErrorTracker } from './components/ErrorTracker'
+import { MemeStickerHUD } from './components/MemeStickerHUD'; 
+import { DownvoteEffectHUD } from './components/DownvoteEffectHUD'; // Import DownvoteEffectHUD
 
 export const Controls = {
   up: 'up',
@@ -140,6 +142,8 @@ function App() {
           </Physics>
         </Suspense>
       </Canvas>
+      <MemeStickerHUD /> 
+      <DownvoteEffectHUD /> {/* Render DownvoteEffectHUD */}
     </ErrorTracker>
   )
 }

@@ -12,21 +12,21 @@ import * as THREE from "three";
 import { Mario } from "./models/characters/Mario_kart";
 import { DriftParticlesLeft } from "./Particles/drifts/DriftParticlesLeft";
 import { DriftParticlesRight } from "./Particles/drifts/DriftParticlesRight";
-
 import { PointParticle } from "./Particles/drifts/PointParticle";
-
 import { SmokeParticles } from "./Particles/smoke/SmokeParticles";
 import { useStore } from "./store";
-import { Cylinder } from "@react-three/drei";
 import FakeGlowMaterial from "./ShaderMaterials/FakeGlow/FakeGlowMaterial";
 import { HitParticles } from "./Particles/hits/HitParticles";
 import { CoinParticles } from "./Particles/coins/CoinParticles";
 import { ItemParticles } from "./Particles/items/ItemParticles";
+import { MushroomBoostParticles } from "./Particles/boosts/MushroomBoostParticles";
+import { UpvoteBoostParticles } from "./Particles/boosts/UpvoteBoostParticles";
 import { geometry } from "maath";
 import { getVehicleStatsForCharacter } from "../config/vehicleStats";
+
 extend(geometry);
 
-const DEBUG = false; // Set to true to enable debug logging
+const DEBUG = false;
 
 export const PlayerController = ({
   player,
@@ -51,29 +51,25 @@ export const PlayerController = ({
   const kart = useRef();
   const cam = useRef();
   
-  // Add Rapier world reference to access collision events
   const { world } = useRapier();
   
-  // Get the selected character from the store
-  const { actions, shouldSlowDown, item, bananas, coins, id, controls, selectedCharacter } = useStore();
-  
-  // Get the vehicle stats for the selected character
+  const { actions, item, id, controls, selectedCharacter, playerEffects, activeBoost, boostEndTime } = useStore();
+  const setStoreItem = useStore(state => state.actions.setItem); 
+
   const characterStats = getVehicleStatsForCharacter(selectedCharacter);
   
-  // Base physics values
   const baseInitialSpeed = 0;
   const baseMaxSpeed = 30;
-  const baseBoostSpeed = 50;
+  const baseBoostSpeed = 50; // For drift boosts
   const baseAcceleration = 0.1;
   const baseDecceleration = 0.2;
   const baseDamping = -0.1;
   const baseMaxSteeringSpeed = 0.01;
   const baseJumpForce = 10;
   
-  // Apply character-specific multipliers to the physics values
   const initialSpeed = baseInitialSpeed;
   const maxSpeed = baseMaxSpeed * characterStats.maxSpeedMultiplier;
-  const boostSpeed = baseBoostSpeed * characterStats.maxSpeedMultiplier;
+  const driftBoostValue = baseBoostSpeed * characterStats.maxSpeedMultiplier; // Renamed from boostSpeed to avoid confusion
   const acceleration = baseAcceleration * characterStats.accelerationMultiplier;
   const decceleration = baseDecceleration;
   const damping = baseDamping;
@@ -81,6 +77,7 @@ export const PlayerController = ({
   
   const [currentSteeringSpeed, setCurrentSteeringSpeed] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(initialSpeed);
+  const [visualItemBoostActive, setVisualItemBoostActive] = useState(false);
   const camMaxOffset = 1;
   let steeringAngle = 0;
   const isOnFloor = useRef(false);
@@ -96,11 +93,12 @@ export const PlayerController = ({
   const orangeTurboThreshold = 30;
   const purpleTurboThreshold = 60;
   const [fireColor, setFireColor] = useState(0xffffff);
-  const boostDuration = useRef(0);
-  const [isBoosting, setIsBoosting] = useState(false);
+  const driftBoostDuration = useRef(0); // Renamed from boostDuration
+  const [isDriftBoosting, setIsDriftBoosting] = useState(false); // Renamed from isBoosting
   let targetXPosition = 0;
   let targetZPosition = 8;
   const [steeringAngleWheels, setSteeringAngleWheels] = useState(0);
+  
   const engineSound = useRef();
   const driftSound = useRef();
   const driftTwoSound = useRef();
@@ -109,20 +107,17 @@ export const PlayerController = ({
   const driftBlueSound = useRef();
   const jumpSound = useRef();
   const landingSound = useRef();
-  const turboSound = useRef();
-  const [scale, setScale] = useState(0);
-  const raycaster = new THREE.Raycaster();
-  const downDirection = new THREE.Vector3(0, -1, 0);
-  const [shouldLaunch, setShouldLaunch] = useState(false);
-  const effectiveBoost = useRef(0);
-  const text = useRef();
+  const turboSound = useRef(); // For drift boost sounds
   
-  const slowDownDuration = useRef(1500);
+  const [scale, setScale] = useState(0);
+  const [shouldLaunch, setShouldLaunch] = useState(false); // Generic flag for particle effects
+  const effectiveDriftBoost = useRef(0); // Renamed from effectiveBoost
+
+  const bananaSlowDownDuration = useRef(1500); // Specific for banana
 
   const rightWheel = useRef();
   const leftWheel = useRef();
   
-  // Add recovery states for wall collision
   const [wallCollisionRecovery, setWallCollisionRecovery] = useState(0);
   const maxSpeedAfterCollision = useRef(maxSpeed);
   const [lastCollisionTime, setLastCollisionTime] = useState(0);
@@ -133,196 +128,226 @@ export const PlayerController = ({
       actions.setLeftWheel(leftWheel.current);
       actions.setRightWheel(rightWheel.current);
     }
-    
-    // Apply weight multiplier to physics body when character changes
     if (body.current) {
-      // Note: This is a simplified implementation - in a real game you'd 
-      // adjust mass more directly, but we're adapting the existing code
       body.current.setMassProperties({
         mass: 1 * characterStats.weightMultiplier,
         centerOfMass: { x: 0, y: 0, z: 0 },
       });
+       // Set RigidBody name for item collision detection (e.g., by TrollTrap)
+       if (id && body.current.name !== id) { // `id` is the PlayroomKit player ID
+        body.current.name = id;
+        if (DEBUG) console.log(`PlayerController: Set RigidBody name to ${id}`);
+      }
     }
-  }, [body.current, selectedCharacter]);
+  }, [body.current, selectedCharacter, actions, id]); // Added id to dependencies
   
   useFrame(({ pointer, clock }, delta) => {
-    if (player.id !== id) return;
+    if (player.id !== id || !body.current || !kart.current || !mario.current) return;
     const time = clock.getElapsedTime();
-    if (!body.current && !mario.current) return;
-    
-    // Continue playing engine sounds during countdown
+    const now = Date.now();
+
+    // --- Sound Management ---
     engineSound.current.setVolume(currentSpeed / 300 + 0.2);
     engineSound.current.setPlaybackRate(currentSpeed / 10 + 0.1);
     jumpSound.current.setPlaybackRate(1.5);
     jumpSound.current.setVolume(0.5);
     driftSound.current.setVolume(0.2);
-
-    // Calculate the actual speed based on physical movement, not just wheel spin
-    // Get the actual velocity of the kart from the physics body
-    const actualVelocity = body.current.linvel();
-    const actualSpeedVector = new THREE.Vector3(actualVelocity.x, 0, actualVelocity.z);
-    // Calculate the magnitude of the velocity (actual speed)
-    const actualSpeed = actualSpeedVector.length();
-    
-    // Handle wall collision recovery
-    if (wallCollisionRecovery > 0) {
-      // Decrease recovery timer
-      setWallCollisionRecovery(wallCollisionRecovery - delta);
-      
-      // Gradually increase max speed back to normal
-      const recoveryProgress = 1 - (wallCollisionRecovery / 2); // 2 seconds total recovery
-      maxSpeedAfterCollision.current = maxSpeed * (0.5 + (0.5 * recoveryProgress));
-    } else if (wallCollisionRecovery <= 0 && maxSpeedAfterCollision.current < maxSpeed) {
-      // Reset when recovery is complete
-      maxSpeedAfterCollision.current = maxSpeed;
-      setWallCollisionRecovery(0);
-    }
-    
-    // Update speed without debouncing - let the HUD handle display rate limiting
-    // Convert to km/h and update display
-    const displaySpeed = Math.round(actualSpeed * 3.6);
-    actions.setCurrentSpeed(displaySpeed);
-
     driftBlueSound.current.setVolume(0.5);
     driftOrangeSound.current.setVolume(0.6);
     driftPurpleSound.current.setVolume(0.7);
-    // HANDLING AND STEERING
-    const kartRotation =
-      kart.current.rotation.y - driftDirection.current * driftForce.current;
-    const forwardDirection = new THREE.Vector3(
-      -Math.sin(kartRotation),
-      0,
-      -Math.cos(kartRotation)
-    );
 
-    if (escPressed) {
-      actions.setGameStarted(false);
+    // --- Speed Display & Stats ---
+    const actualVelocity = body.current.linvel();
+    const actualSpeed = new THREE.Vector3(actualVelocity.x, 0, actualVelocity.z).length();
+    actions.setCurrentSpeed(Math.round(actualSpeed * 3.6));
+
+    // --- Wall Collision Recovery ---
+    if (wallCollisionRecovery > 0) {
+      setWallCollisionRecovery(wallCollisionRecovery - delta);
+      const recoveryProgress = 1 - (wallCollisionRecovery / 2); 
+      maxSpeedAfterCollision.current = maxSpeed * (0.5 + (0.5 * recoveryProgress));
+    } else if (wallCollisionRecovery <= 0 && maxSpeedAfterCollision.current < maxSpeed) {
+      maxSpeedAfterCollision.current = maxSpeed;
+      setWallCollisionRecovery(0);
     }
-    if(kartRotation){
-      leftWheel.current.kartRotation = kartRotation;
+
+    // --- Player Effects Evaluation ---
+    const currentPlayerEffect = playerEffects?.[id] || {};
+    
+    // Downvote Effect
+    const isPlayerDownvoted = currentPlayerEffect.isSlowed && now < currentPlayerEffect.slowEndTime;
+    if (currentPlayerEffect.isSlowed && now >= currentPlayerEffect.slowEndTime) {
+        actions.removeSlowdown(id); 
+    }
+
+    // Item Boost Effect (Mushroom, UpvoteBoost)
+    let isItemBoosting = false; 
+    if (activeBoost && now < boostEndTime) {
+        isItemBoosting = true;
+    } else if (activeBoost && now >= boostEndTime) {
+        actions.removeBoost(); 
+    }
+    useEffect(() => { // Manage visualItemBoostActive based on isItemBoosting
+        setVisualItemBoostActive(isItemBoosting);
+    }, [isItemBoosting]);
+
+    // Disorientation Effect (Troll Trap)
+    const isPlayerDisoriented = currentPlayerEffect.isDisoriented && now < currentPlayerEffect.disorientationEndTime;
+    const playerDisorientationType = currentPlayerEffect.disorientationType;
+    if (currentPlayerEffect.isDisoriented && now >= currentPlayerEffect.disorientationEndTime) {
+        actions.removeDisorientation(id); // Fallback removal
+        if (cam.current && cam.current.userData.originalFov) { // Reset FOV if changed by screenShake
+            cam.current.fov = cam.current.userData.originalFov;
+            cam.current.updateProjectionMatrix();
+            delete cam.current.userData.originalFov;
+        }
+    }
+
+    // --- Steering Input Processing (with potential disorientation) ---
+    let actualLeftPressed = leftPressed;
+    let actualRightPressed = rightPressed;
+    let actualPointerX = pointer.x;
+
+    if (isPlayerDisoriented && playerDisorientationType === "invertedControls") {
+        actualLeftPressed = rightPressed; 
+        actualRightPressed = leftPressed;
+        actualPointerX = -pointer.x;    
+    }
+    // (Screen Shake camera effect will be applied below, before camera position lerping)
+    
+    // --- Speed & Acceleration Modification Order ---
+    let calculatedAcceleration = acceleration; 
+    let calculatedMaxSpeed = maxSpeed; 
+    calculatedMaxSpeed = Math.min(calculatedMaxSpeed, maxSpeedAfterCollision.current); // Apply wall recovery
+
+    if (isPlayerDownvoted) { // Apply Downvote
+      calculatedAcceleration *= 0.6; 
+      calculatedMaxSpeed *= 0.6;     
+    }
+    if (isItemBoosting) { // Apply Item Boosts
+        if (activeBoost === "mushroom") {
+            calculatedMaxSpeed *= 1.5;       
+            calculatedAcceleration *= 1.7; 
+        } else if (activeBoost === "upvoteBoost") {
+            calculatedMaxSpeed *= 1.7;
+            calculatedAcceleration *= 2.0;
+        }
     }
     
-    // Calculate steering input, but only apply rotation if not in countdown
-    if (leftPressed && currentSpeed > 0) {
+    // Final speed variables for this frame
+    const finalUsableMaxSpeed = calculatedMaxSpeed;
+    const finalUsableAcceleration = calculatedAcceleration;
+
+    // --- Visual Cues (shouldLaunch, wheelSpinning) ---
+    const globalShouldSlow = actions.getShouldSlowDown(); // For banana
+    let launchNow = false;
+    let spinWheelsNow = false;
+
+    if (globalShouldSlow) { // Banana is dominant
+        launchNow = true;
+        spinWheelsNow = true;
+    } else { // Check item effects if no banana
+        if (isPlayerDownvoted) {
+            launchNow = true;
+            spinWheelsNow = true;
+        } else if (isItemBoosting) {
+            launchNow = true; // Boosts might have flame particles
+            // spinWheelsNow remains false for boosts
+        }
+    }
+    if (shouldLaunch !== launchNow) setShouldLaunch(launchNow);
+    if (rightWheel.current && !driftLeft.current && !driftRight.current) { // Don't override drift visuals
+        if (rightWheel.current.isSpinning !== spinWheelsNow) rightWheel.current.isSpinning = spinWheelsNow;
+    }
+    
+    // --- Steering Logic ---
+    // Uses actualLeftPressed, actualRightPressed, actualPointerX which may be inverted by disorientation
+    if (actualLeftPressed && currentSpeed > 0) {
       steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
-    } else if (rightPressed && currentSpeed > 0) {
+    } else if (actualRightPressed && currentSpeed > 0) {
       steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
-    } else if (rightPressed && currentSpeed < 0) {
+    } else if (actualRightPressed && currentSpeed < 0) { 
       steeringAngle = countdownFreeze ? 0 : currentSteeringSpeed;
       targetXPosition = -camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? currentSteeringSpeed * 25 : steeringAngle * 25);
-    } else if (leftPressed && currentSpeed < 0) {
+    } else if (actualLeftPressed && currentSpeed < 0) { 
       steeringAngle = countdownFreeze ? 0 : -currentSteeringSpeed;
       targetXPosition = camMaxOffset;
-      // Still set wheel visuals even during countdown
-      setSteeringAngleWheels(countdownFreeze ? -currentSteeringSpeed * 25 : steeringAngle * 25);
     } else {
       steeringAngle = 0;
       targetXPosition = 0;
-      setSteeringAngleWheels(0);
     }
-
-    // mouse steering
-
-    if (!driftLeft.current && !driftRight.current) {
-      steeringAngle = currentSteeringSpeed * -pointer.x;
-      targetXPosition = -camMaxOffset * -pointer.x;
-    } else if (driftLeft.current && !driftRight.current) {
-      steeringAngle = currentSteeringSpeed * -(pointer.x - 1);
-      targetXPosition = -camMaxOffset * -pointer.x;
-    } else if (driftRight.current && !driftLeft.current) {
-      steeringAngle = currentSteeringSpeed * -(pointer.x + 1);
-      targetXPosition = -camMaxOffset * -pointer.x;
+    if (controls !== 'keyboard' || (!actualLeftPressed && !actualRightPressed)) { 
+        if (!driftLeft.current && !driftRight.current) {
+          steeringAngle = currentSteeringSpeed * -actualPointerX;
+          targetXPosition = -camMaxOffset * -actualPointerX;
+        } else if (driftLeft.current && !driftRight.current) { 
+          steeringAngle = currentSteeringSpeed * -(actualPointerX - 1); 
+          targetXPosition = -camMaxOffset * -actualPointerX;
+        } else if (driftRight.current && !driftLeft.current) {
+          steeringAngle = currentSteeringSpeed * -(actualPointerX + 1);
+          targetXPosition = -camMaxOffset * -actualPointerX;
+        }
     }
-    // ACCELERATING
-    const shouldSlow = actions.getShouldSlowDown();
+    if(countdownFreeze) { 
+        steeringAngle = 0;
+        targetXPosition = 0;
+    }
+    setSteeringAngleWheels(steeringAngle * 25); // Visual wheel steering
 
-    if (upPressed && currentSpeed < maxSpeedAfterCollision.current) {
-      // Use the potentially reduced max speed if in recovery
+    // --- Acceleration / Deceleration ---
+    if (upPressed && currentSpeed < finalUsableMaxSpeed) {
       if (!countdownFreeze) {
         setCurrentSpeed(
-          Math.min(currentSpeed + acceleration * delta * 144, maxSpeedAfterCollision.current)
+          Math.min(currentSpeed + finalUsableAcceleration * delta * 144, finalUsableMaxSpeed)
         );
       }
-    } else if (
-      upPressed &&
-      currentSpeed > maxSpeedAfterCollision.current &&
-      effectiveBoost.current > 0
-    ) {
+    } else if (upPressed && currentSpeed > finalUsableMaxSpeed && effectiveDriftBoost.current > 0) { // Slowing down from drift boost if over limit
       setCurrentSpeed(
-        Math.max(currentSpeed - decceleration * delta * 144, maxSpeedAfterCollision.current)
+        Math.max(currentSpeed - decceleration * delta * 144, finalUsableMaxSpeed)
       );
     }
 
-    if (upPressed) {
+    if (upPressed) { // Steering speed buildup
       if (currentSteeringSpeed < MaxSteeringSpeed) {
-        setCurrentSteeringSpeed(
-          Math.min(
-            currentSteeringSpeed + 0.0001 * delta * 144,
-            MaxSteeringSpeed
-          )
-        );
+        setCurrentSteeringSpeed(Math.min(currentSteeringSpeed + 0.0001 * delta * 144, MaxSteeringSpeed));
       }
     }
-    if (shouldSlow) {
-      rightWheel.current.isSpinning = true;
-
-      setCurrentSpeed(
-        Math.max(currentSpeed - decceleration * 2 * delta * 144, 0)
-      );
-      setCurrentSteeringSpeed(0);
-      slowDownDuration.current -= 1500 * delta;
-      setShouldLaunch(true);
-      if (slowDownDuration.current <= 1) {
-        rightWheel.current.isSpinning = false;
-        actions.setShouldSlowDown(false);
-        slowDownDuration.current = 1500;
-        setShouldLaunch(false);
+    
+    // Banana Slowdown Logic (distinct from item slowdown)
+    if (globalShouldSlow) {
+      setCurrentSpeed(Math.max(currentSpeed - decceleration * 2 * delta * 144, 0));
+      setCurrentSteeringSpeed(0); 
+      bananaSlowDownDuration.current -= 1500 * delta; 
+      if (bananaSlowDownDuration.current <= 1) {
+        actions.setShouldSlowDown(false); 
+        bananaSlowDownDuration.current = 1500;
+        // Visuals reset by the main visual cue logic if no other effects are active
       }
     }
 
-    // REVERSING
-    if (downPressed) {
+    // --- Reversing / Natural Deceleration ---
+    if (downPressed) { // Reversing
       if (currentSteeringSpeed < MaxSteeringSpeed) {
-        setCurrentSteeringSpeed(
-          Math.min(
-            currentSteeringSpeed + 0.0001 * delta * 144,
-            MaxSteeringSpeed
-          )
-        );
+        setCurrentSteeringSpeed(Math.min(currentSteeringSpeed + 0.0001 * delta * 144, MaxSteeringSpeed));
       }
-    }
-
-    if (downPressed && currentSpeed <= 0) {
-      setCurrentSpeed(
-        Math.max(currentSpeed - acceleration * delta * 144, -maxSpeed)
-      );
-    }
-    // DECELERATING
-    else if (!upPressed) {
+      if (currentSpeed <= 0) { // Allow reversing up to -maxSpeed (or a fraction of it)
+         setCurrentSpeed(Math.max(currentSpeed - finalUsableAcceleration * delta * 144, -maxSpeed * 0.5));
+      } else { // Braking if moving forward
+         setCurrentSpeed(Math.max(currentSpeed - decceleration * 2 * delta * 144, 0));
+      }
+    } else if (!upPressed) { // Natural deceleration
       if (currentSteeringSpeed > 0) {
-        setCurrentSteeringSpeed(
-          Math.max(currentSteeringSpeed - 0.00005 * delta * 144, 0)
-        );
+        setCurrentSteeringSpeed(Math.max(currentSteeringSpeed - 0.00005 * delta * 144, 0));
       } else if (currentSteeringSpeed < 0) {
-        setCurrentSteeringSpeed(
-          Math.min(currentSteeringSpeed + 0.00005 * delta * 144, 0)
-        );
+        setCurrentSteeringSpeed(Math.min(currentSteeringSpeed + 0.00005 * delta * 144, 0));
       }
       setCurrentSpeed(Math.max(currentSpeed - decceleration * delta * 144, 0));
     }
 
-    // Update the kart's rotation based on the steering angle
+    // --- Kart Physics Update ---
     kart.current.rotation.y += steeringAngle * delta * 144;
-
-    // Apply damping to simulate slowdown when no keys are pressed
     body.current.applyImpulse(
       {
         x: -body.current.linvel().x * (1 - damping) * delta * 144,
@@ -332,268 +357,9 @@ export const PlayerController = ({
       true
     );
     const bodyPosition = body.current.translation();
-    kart.current.position.set(
-      bodyPosition.x,
-      bodyPosition.y - 0.5,
-      bodyPosition.z
-    );
+    kart.current.position.set(bodyPosition.x, bodyPosition.y - 0.5, bodyPosition.z);
 
-    // JUMPING
-    if (jumpPressed && isOnGround && !jumpIsHeld.current) {
-      // Apply jump force with character's jump multiplier
-      jumpForce.current += baseJumpForce * characterStats.jumpForceMultiplier;
-      isOnFloor.current = false;
-      jumpIsHeld.current = true;
-      jumpSound.current.play();
-      setIsOnGround(false);
-
-      if (jumpSound.current.isPlaying) {
-        jumpSound.current.stop();
-        jumpSound.current.play();
-      }
-    }
-
-    if (isOnFloor.current && jumpForce.current > 0) {
-      landingSound.current.play();
-    }
-    if (!isOnGround && jumpForce.current > 0) {
-      jumpForce.current -= 1 * delta * 144;
-    }
-    if (!jumpPressed) {
-      jumpIsHeld.current = false;
-    }
-    
-    // DRIFTING - Using classic Mario Kart style drift logic
-    // Start drift when jumping and steering
-    if (jumpIsHeld.current && upPressed && Math.abs(pointer.x) > 0.1) {
-      if (pointer.x < -0.1 && !driftRight.current) {
-        driftLeft.current = true;
-        
-        // Set initial scale for particles when drift starts
-        const oscillation = Math.sin(time * 1000) * 0.1;
-        const vibration = oscillation + 0.9;
-        setScale(vibration * 0.8);
-        
-        // Start drift sound if needed
-        if (!driftSound.current.isPlaying) {
-          driftSound.current.play();
-        }
-      }
-      if (pointer.x > 0.1 && !driftLeft.current) {
-        driftRight.current = true;
-        
-        // Set initial scale for particles when drift starts
-        const oscillation = Math.sin(time * 1000) * 0.1;
-        const vibration = oscillation + 0.9;
-        setScale(vibration * 0.8);
-        
-        // Start drift sound if needed
-        if (!driftSound.current.isPlaying) {
-          driftSound.current.play();
-        }
-      }
-    }
-    
-    // End drift only when releasing the jump button
-    if (!jumpIsHeld.current) {
-      // When drift ends, if we've accumulated enough power, apply boost
-      if ((driftLeft.current || driftRight.current) && accumulatedDriftPower.current > 1) {
-        // Drift released - apply boost based on accumulated power
-        setIsBoosting(true);
-        effectiveBoost.current = boostDuration.current;
-        boostDuration.current = 0;
-      }
-      
-      // Reset drift state
-      driftLeft.current = false;
-      driftRight.current = false;
-      driftDirection.current = 0;
-      driftForce.current = 0;
-    }
-
-    if (!jumpIsHeld.current && !driftLeft.current && !driftRight.current) {
-      mario.current.rotation.y = THREE.MathUtils.lerp(
-        mario.current.rotation.y,
-        0,
-        0.0001 * delta * 144
-      );
-      setFireColor(0xffffff);
-      accumulatedDriftPower.current = 0;
-      driftSound.current.stop();
-      driftTwoSound.current.stop();
-      driftOrangeSound.current.stop();
-      driftPurpleSound.current.stop();
-    }
-
-    if (driftLeft.current) {
-      driftDirection.current = 1;
-      driftForce.current = 0.4;
-      mario.current.rotation.y = THREE.MathUtils.lerp(
-        mario.current.rotation.y,
-        steeringAngle * 25 + 0.4,
-        0.05 * delta * 144
-      );
-      if (isOnFloor.current) {
-        leftWheel.current.isSpinning = true;
-        // Apply drift power multiplier based on character stats
-        accumulatedDriftPower.current +=
-          0.1 * (steeringAngle + 1) * delta * 144 * characterStats.driftPowerMultiplier;
-      }
-    }
-    if (driftRight.current) {
-      driftDirection.current = -1;
-      driftForce.current = 0.4;
-      mario.current.rotation.y = THREE.MathUtils.lerp(
-        mario.current.rotation.y,
-        -(-steeringAngle * 25 + 0.4),
-        0.05 * delta * 144
-      );
-      if(isOnFloor.current){
-        leftWheel.current.isSpinning = true;
-        // Apply drift power multiplier based on character stats
-        accumulatedDriftPower.current += 0.1 * (-steeringAngle + 1) * delta * 144 * characterStats.driftPowerMultiplier;
-      }
-    }
-    if (!driftLeft.current && !driftRight.current) {
-      mario.current.rotation.y = THREE.MathUtils.lerp(
-        mario.current.rotation.y,
-        steeringAngle * 30,
-        0.05 * delta * 144
-      );
-      setScale(0);
-      if((pointer.x > 0.8 || pointer.x < -0.8) && currentSpeed > 20 && isOnFloor.current){
-        leftWheel.current.isSpinning = true;
-      } else {
-        leftWheel.current.isSpinning = false;
-      }
-    }
-    if (accumulatedDriftPower.current > blueTurboThreshold) {
-      setFireColor(0x00ffff);
-      boostDuration.current = 50;
-      driftBlueSound.current.play();
-    }
-    if (accumulatedDriftPower.current > orangeTurboThreshold) {
-      setFireColor(0xffcf00);
-      boostDuration.current = 100;
-      driftBlueSound.current.stop();
-      driftOrangeSound.current.play();
-    }
-    if (accumulatedDriftPower.current > purpleTurboThreshold) {
-      setFireColor(0xff00ff);
-      boostDuration.current = 250;
-      driftOrangeSound.current.stop();
-      driftPurpleSound.current.play();
-    }
-
-    if (driftLeft.current || driftRight.current) {
-      const oscillation = Math.sin(time * 1000) * 0.1;
-      const vibration = oscillation + 0.9;
-      if (fireColor === 0xffffff) {
-        setScale(vibration * 0.8);
-      } else {
-        setScale(vibration);
-      }
-      if (isOnFloor.current && !driftSound.current.isPlaying) {
-        driftSound.current.play();
-        driftTwoSound.current.play();
-        landingSound.current.play();
-      }
-    }
-    // RELEASING DRIFT
-
-    if (boostDuration.current > 1 && !jumpIsHeld.current) {
-      setIsBoosting(true);
-      effectiveBoost.current = boostDuration.current;
-      boostDuration.current = 0;
-    } else if (effectiveBoost.current <= 1) {
-      targetZPosition = 8;
-      setIsBoosting(false);
-    }
-
-    if (isBoosting && effectiveBoost.current > 1) {
-      setCurrentSpeed(boostSpeed);
-      effectiveBoost.current -= 1 * delta * 144;
-      targetZPosition = 10;
-      if (!turboSound.current.isPlaying) turboSound.current.play();
-      driftTwoSound.current.play();
-      driftBlueSound.current.stop();
-      driftOrangeSound.current.stop();
-      driftPurpleSound.current.stop();
-    } else if (effectiveBoost.current <= 1) {
-      setIsBoosting(false);
-      targetZPosition = 8;
-      turboSound.current.stop();
-    }
-
-    // CAMERA WORK
-
-    cam.current.updateMatrixWorld();
-
-    cam.current.position.x = THREE.MathUtils.lerp(
-      cam.current.position.x,
-      targetXPosition,
-      0.01 * delta * 144
-    );
-
-    cam.current.position.z = THREE.MathUtils.lerp(
-      cam.current.position.z,
-      targetZPosition,
-      0.01 * delta * 144
-    );
-
-    // RESTORE VELOCITY-BASED WALL DETECTION alongside Rapier physics
-    // This is a backup method in case the collision events don't work properly
-    if (!hasCollided.current && wallCollisionRecovery <= 0) {
-      const speedRatio = actualSpeed / (Math.abs(currentSpeed) + 0.01); // Avoid division by zero
-      const isAgainstWall = (speedRatio < 0.6 && Math.abs(currentSpeed) > 5) || 
-                           (Math.abs(actualSpeed) < 0.8 && Math.abs(currentSpeed) > 6);
-      
-      // Don't detect wall collisions during drift to avoid interfering with drift mechanics
-      if (isAgainstWall && !(driftLeft.current || driftRight.current)) {
-        if (DEBUG) console.log("Velocity-based wall collision detected!");
-        const currentTime = Date.now();
-        if (currentTime - lastCollisionTime > 400) { // Don't process if we collided recently
-          setLastCollisionTime(currentTime);
-          hasCollided.current = true;
-          
-          // Apply bounce-back force
-          const bumpForce = 25 * characterStats.weightMultiplier;
-          body.current.applyImpulse(
-            {
-              x: -forwardDirection.x * bumpForce,
-              y: 0, // No vertical bounce
-              z: -forwardDirection.z * bumpForce,
-            },
-            true
-          );
-          
-          // Apply speed penalty
-          setCurrentSpeed(Math.max(currentSpeed * 0.3, 0)); // Reduce to 30% of current speed
-          maxSpeedAfterCollision.current = maxSpeed * 0.2; // Limit max speed to 20% during recovery
-          setWallCollisionRecovery(3); // 3-second recovery period
-          
-          // Play collision sound
-          if (landingSound.current) {
-            if (landingSound.current.isPlaying) {
-              landingSound.current.stop();
-            }
-            landingSound.current.play();
-            landingSound.current.setVolume(1.0);
-          }
-          
-          // Reset collision state after a delay
-          setTimeout(() => {
-            if (body.current) hasCollided.current = false;
-          }, 400);
-        }
-      }
-    }
-
-    // Instead of the custom wall collision logic, we now rely on Rapier's collision events
-    // The collision detection is handled in onCollisionEnter of the RigidBody
-    
-    // Apply movement impulse only if not in countdown
-    if (!countdownFreeze) {
+    if (!countdownFreeze) { // Apply forward/backward impulse
       body.current.applyImpulse(
         {
           x: forwardDirection.x * currentSpeed * delta * 144,
@@ -602,168 +368,247 @@ export const PlayerController = ({
         },
         true
       );
-    } else {
-      // During countdown, only apply vertical force (for jumps)
-      body.current.applyImpulse(
-        {
-          x: 0,
-          y: 0 + jumpForce.current * delta * 144,
-          z: 0,
-        },
-        true
-      );
+    } else { // Only vertical impulse during countdown (for jumps)
+       body.current.applyImpulse({ x: 0, y: jumpForce.current * delta * 144, z: 0}, true);
+    }
+    jumpForce.current = Math.max(0, jumpForce.current - 1 * delta * 144);
+
+
+    // --- Jumping ---
+    if (jumpPressed && isOnGround && !jumpIsHeld.current) {
+      jumpForce.current = baseJumpForce * characterStats.jumpForceMultiplier;
+      setIsOnGround(false); // Changed from isOnFloor.current = false
+      jumpIsHeld.current = true;
+      jumpSound.current.play();
+    }
+    if (!jumpPressed) {
+      jumpIsHeld.current = false;
+    }
+    if (isOnGround && jumpForce.current <=0) { // Simplified condition for landing sound
+       // landingSound.current.play(); // This might play too often, consider condition
+    }
+    
+    // --- Drifting ---
+    if (jumpIsHeld.current && upPressed && Math.abs(actualPointerX) > 0.1 && currentSpeed > 5) { // Use actualPointerX for drift initiation with inverted controls
+      if (actualPointerX < -0.1 && !driftRight.current) driftLeft.current = true;
+      if (actualPointerX > 0.1 && !driftLeft.current) driftRight.current = true;
+      if ((driftLeft.current || driftRight.current) && !driftSound.current.isPlaying) driftSound.current.play();
+    }
+    if (!jumpIsHeld.current) { // End drift
+      if ((driftLeft.current || driftRight.current) && accumulatedDriftPower.current > 1) {
+        setIsDriftBoosting(true);
+        effectiveDriftBoost.current = driftBoostDuration.current;
+        driftBoostDuration.current = 0;
+      }
+      driftLeft.current = false;
+      driftRight.current = false;
+      driftDirection.current = 0;
+      driftForce.current = 0;
+    }
+    // ... (rest of drift logic: accumulation, sounds, mario rotation, fireColor, particle scale)
+     if (!jumpIsHeld.current && !driftLeft.current && !driftRight.current) {
+      mario.current.rotation.y = THREE.MathUtils.lerp(mario.current.rotation.y, 0, 0.05 * delta * 144 );
+      setFireColor(0xffffff);
+      accumulatedDriftPower.current = 0;
+      if(driftSound.current.isPlaying) driftSound.current.stop();
+      if(driftTwoSound.current.isPlaying) driftTwoSound.current.stop();
+      if(driftOrangeSound.current.isPlaying) driftOrangeSound.current.stop();
+      if(driftPurpleSound.current.isPlaying) driftPurpleSound.current.stop();
+      setScale(0);
+    }
+    if (driftLeft.current || driftRight.current) {
+        const baseDriftAngle = 0.4;
+        driftDirection.current = driftLeft.current ? 1 : -1;
+        driftForce.current = 0.4; // This seems to be related to kart rotation offset, not a physics force
+        mario.current.rotation.y = THREE.MathUtils.lerp(mario.current.rotation.y, steeringAngle * 25 + (baseDriftAngle * driftDirection.current), 0.05 * delta * 144);
+        if (isOnGround) {
+            if(leftWheel.current) leftWheel.current.isSpinning = true; // Both wheels for drift particles
+            if(rightWheel.current) rightWheel.current.isSpinning = true;
+            accumulatedDriftPower.current += 0.1 * (Math.abs(steeringAngle) + 1) * delta * 144 * characterStats.driftPowerMultiplier;
+        }
+        const oscillation = Math.sin(time * 20) * 0.05; // Adjusted speed for oscillation
+        const vibration = oscillation + 0.95;
+        if (fireColor === 0xffffff) setScale(vibration * 0.6); else setScale(vibration * 0.8);
+        if (isOnGround && !driftSound.current.isPlaying) driftSound.current.play();
+        if (isOnGround && !driftTwoSound.current.isPlaying && accumulatedDriftPower.current > blueTurboThreshold / 2) driftTwoSound.current.play();
     }
 
-    // Update the kart's rotation based on the steering angle
-    setSteeringAngleWheels(steeringAngle * 25);
+    if (accumulatedDriftPower.current > blueTurboThreshold && accumulatedDriftPower.current < orangeTurboThreshold) {
+      setFireColor(0x00ccff); driftBoostDuration.current = 50;
+      if(!driftBlueSound.current.isPlaying && !driftOrangeSound.current.isPlaying && !driftPurpleSound.current.isPlaying) driftBlueSound.current.play();
+    } else if (accumulatedDriftPower.current >= orangeTurboThreshold && accumulatedDriftPower.current < purpleTurboThreshold) {
+      setFireColor(0xffa500); driftBoostDuration.current = 100;
+      if(driftBlueSound.current.isPlaying) driftBlueSound.current.stop();
+      if(!driftOrangeSound.current.isPlaying && !driftPurpleSound.current.isPlaying) driftOrangeSound.current.play();
+    } else if (accumulatedDriftPower.current >= purpleTurboThreshold) {
+      setFireColor(0xcc00ff); driftBoostDuration.current = 150; // Slightly shorter purple for balance
+      if(driftOrangeSound.current.isPlaying) driftOrangeSound.current.stop();
+      if(!driftPurpleSound.current.isPlaying) driftPurpleSound.current.play();
+    }
 
-    // SOUND WORK
 
-    // MISC
+    // Drift Boost Activation
+    if (isDriftBoosting && effectiveDriftBoost.current > 1) {
+      setCurrentSpeed(driftBoostValue); // Use specific drift boost value
+      effectiveDriftBoost.current -= 1 * delta * 144;
+      targetZPosition = 10; // Camera effect for drift boost
+      if (!turboSound.current.isPlaying) turboSound.current.play();
+      // Stop colored drift sounds when main turbo sound plays
+      if(driftBlueSound.current.isPlaying) driftBlueSound.current.stop();
+      if(driftOrangeSound.current.isPlaying) driftOrangeSound.current.stop();
+      if(driftPurpleSound.current.isPlaying) driftPurpleSound.current.stop();
+      if(!driftTwoSound.current.isPlaying) driftTwoSound.current.play(); // Keep general drift sound
+    } else if (effectiveDriftBoost.current <= 1 && isDriftBoosting) {
+      setIsDriftBoosting(false); // End drift boost state
+      targetZPosition = 8;
+      if(turboSound.current.isPlaying) turboSound.current.stop();
+    }
+    
 
+    // --- Camera ---
+    // Apply screen shake before lerping to target
+    if (isPlayerDisoriented && playerDisorientationType === "screenShake" && cam.current) {
+        // Calculate shake progress (1 to 0) for fading out effect
+        let shakeDurationMs = 3000; // Default shake duration
+        if (currentPlayerEffect.disorientationEndTime && currentPlayerEffect.disorientationEndTime > now) {
+            shakeDurationMs = Math.min(3000, currentPlayerEffect.disorientationEndTime - now);
+        }
+        const shakeProgress = shakeDurationMs > 0 ? Math.max(0, shakeDurationMs / 3000) : 0; 
+        
+        const shakeIntensity = 0.015 * shakeProgress * shakeProgress; // Reduced intensity
+
+        // Apply shake relative to camera's current local axes
+        const randomLocalShake = new THREE.Vector3(
+            (Math.random() - 0.5) * shakeIntensity * 1.5, 
+            (Math.random() - 0.5) * shakeIntensity * 1.0,
+            0 
+        );
+        const worldShake = randomLocalShake.applyQuaternion(cam.current.quaternion.clone());
+        cam.current.position.add(worldShake);
+        
+        if (!cam.current.userData.originalFov) { 
+            cam.current.userData.originalFov = cam.current.fov;
+        }
+        let fovChange = (Math.random() - 0.5) * shakeIntensity * 4; // Reduced FOV shake
+        const newFov = THREE.MathUtils.clamp((cam.current.userData.originalFov || 50) + fovChange, 48, 55); // Clamp FOV tighter
+        if (Math.abs(cam.current.fov - newFov) > 0.05) { 
+            cam.current.fov = newFov;
+            cam.current.updateProjectionMatrix();
+        }
+    }
+
+    cam.current.position.x = THREE.MathUtils.lerp(cam.current.position.x, targetXPosition, 0.05 * delta * 144);
+    cam.current.position.z = THREE.MathUtils.lerp(cam.current.position.z, targetZPosition, 0.05 * delta * 144);
+    cam.current.updateMatrixWorld();
+
+
+    // --- Item Usage ---
+    if (shootPressed && item) { // Check if item is not null
+        if (item === "banana") {
+            const distanceBehind = 2;
+            const scaledBackwardDirection = forwardDirection.clone().multiplyScalar(distanceBehind);
+            const kartPosition = vec3(body.current.translation());
+            const bananaPosition = new THREE.Vector3().subVectors(kartPosition, scaledBackwardDirection);
+            const newBanana = { id: `${id}-${Date.now()}`, position: [bananaPosition.x, bananaPosition.y, bananaPosition.z], player: true };
+            if (setNetworkBananas && networkBananas) setNetworkBananas([...networkBananas, newBanana]); else actions.addBanana(newBanana); // Fallback to local
+            actions.useItem(); // Consumes item from store
+        } else if (item === "shell") {
+            const distanceForward = 2; // Shells shoot forward
+            const scaledForwardDirection = forwardDirection.clone().multiplyScalar(distanceForward);
+            const kartPosition = vec3(body.current.translation());
+            const shellPosition = new THREE.Vector3().addVectors(kartPosition, scaledForwardDirection);
+            const newShell = { id: `${id}-${Date.now()}`, position: [shellPosition.x, shellPosition.y + 0.2, shellPosition.z], rotation: kartRotation, player: true };
+            if (setNetworkShells && networkShells) setNetworkShells([...networkShells, newShell]); else actions.addShell(newShell); // Fallback to local
+            actions.useItem();
+        } else if (item === "trollTrap") {
+            const distanceBehind = 2.0; 
+            const currentPositionVec = vec3(body.current.translation());
+            const normalizedForward = forwardDirection.clone().normalize();
+            const trapPosition = new THREE.Vector3(currentPositionVec.x, currentPositionVec.y, currentPositionVec.z)
+              .addScaledVector(normalizedForward, -distanceBehind); 
+            const newTrap = { id: `${id}-${Date.now()}`, position: [trapPosition.x, trapPosition.y - 0.45, trapPosition.z], rotation: [0, kart.current.rotation.y, 0], playerId: id };
+            actions.addTrollTrap(newTrap); 
+            setStoreItem(null); // Use the aliased setItem from store to consume
+        } else {
+            // For items like mushroom, upvoteBoost, downvote, memeSticker,
+            // actions.useItem() in store.jsx handles their effects.
+            // We still need to call it here if shootPressed and item exists.
+            actions.useItem();
+        }
+    }
+    
+    // --- Reset ---
     if (resetPressed) {
-      body.current.setTranslation({ x: 8, y: 2, z: -119 });
+      body.current.setTranslation({ x: 8, y: 2, z: -119 }); // Reset to a default position
       body.current.setLinvel({ x: 0, y: 0, z: 0 });
       body.current.setAngvel({ x: 0, y: 0, z: 0 });
+      kart.current.rotation.y = Math.PI / 2; // Reset rotation
       setCurrentSpeed(0);
       setCurrentSteeringSpeed(0);
-      setIsBoosting(false);
-      effectiveBoost.current = 0;
-      setIsOnGround(false);
-      jumpForce.current = 0;
-      driftDirection.current = 0;
-      kart.current.rotation.y = Math.PI / 2;
+      setIsDriftBoosting(false); effectiveDriftBoost.current = 0;
+      jumpForce.current = 0; setIsOnGround(false);
+      // Reset item related states in the store if needed, e.g. actions.resetPlayerEffects(id);
     }
 
-    // ITEMS
-
-    if (shootPressed && item === "banana") {
-      const distanceBehind = 2;
-      const scaledBackwardDirection =
-        forwardDirection.multiplyScalar(distanceBehind);
-
-      const kartPosition = new THREE.Vector3(
-        ...vec3(body.current.translation())
-      );
-
-      const bananaPosition = kartPosition.sub(scaledBackwardDirection);
-      const newBanana = {
-        id: Math.random() + "-" + +new Date(),
-        position: bananaPosition,
-        player: true,
-      };
-      setNetworkBananas([...networkBananas, newBanana]);
-
-      actions.useItem();
+    // --- Update Player State for Network ---
+    if (player) { // Check if player object from PlayroomKit is available
+        player.setState("position", body.current.translation());
+        player.setState("rotation", kart.current.rotation.y + (mario.current?.rotation.y || 0) ); // Include mario's visual rotation
+        player.setState("isDriftBoosting", isDriftBoosting); // Drift boost state
+        player.setState("isItemBoosting", isItemBoosting); // Item boost state (Mushroom, Upvote)
+        player.setState("isDownvoted", isPlayerDownvoted); // Downvoted state
+        // player.setState("isDisoriented", isPlayerDisoriented); // (To be added)
+        player.setState("shouldLaunch", shouldLaunch); // For general effects like smoke/sparks
+        player.setState("fireColor", fireColor); // Drift particle color
+        player.setState("driftScale", scale); // Drift particle scale
     }
-
-    if (shootPressed && item === "shell") {
-      const distanceBehind = -2;
-      const scaledBackwardDirection =
-        forwardDirection.multiplyScalar(distanceBehind);
-
-      const kartPosition = new THREE.Vector3(
-        body.current.translation().x,
-        body.current.translation().y,
-        body.current.translation().z
-      );
-
-      const shellPosition = kartPosition.sub(scaledBackwardDirection);
-      const newShell = {
-        id: Math.random() + "-" + +new Date(),
-        position: shellPosition,
-        player: true,
-        rotation: kartRotation,
-      };
-      setNetworkShells([...networkShells, newShell]);
-      actions.useItem();
-    }
-
-    if (shootPressed && item === "mushroom") {
-      setIsBoosting(true);
-      effectiveBoost.current = 300;
-      actions.useItem();
-    }
-
-    player.setState("position", body.current.translation());
-    player.setState("rotation", kartRotation + mario.current.rotation.y);
-    player.setState("isBoosting", isBoosting);
-    player.setState("shouldLaunch", shouldLaunch);
-    player.setState("fireColor", fireColor);
-    player.setState("scale", scale);
-    player.setState("bananas", bananas);
   });
 
-  // Function to handle wall collisions
   const handleWallCollision = (collisionInfo) => {
-    // Only process wall collisions if we're moving fast enough and haven't collided recently
     if (body.current && !hasCollided.current && player.id === id) {
       const currentTime = Date.now();
-      if (currentTime - lastCollisionTime < 400) return; // Prevent multiple collisions within 400ms
-      
-      // Skip collision handling during drift to prevent interrupting drift mechanics
+      if (currentTime - lastCollisionTime < 400) return; 
       if (driftLeft.current || driftRight.current) return;
       
-      // Check if we have significant speed before applying collision effects
       const actualVelocity = body.current.linvel();
-      const actualSpeedVector = new THREE.Vector3(actualVelocity.x, 0, actualVelocity.z);
-      const actualSpeed = actualSpeedVector.length();
-      
-      // Only apply collision if we're moving at a decent speed
+      const actualSpeed = new THREE.Vector3(actualVelocity.x, 0, actualVelocity.z).length();
       if (actualSpeed < 3) return;
       
-      if (DEBUG) console.log("Wall collision detected! Speed:", actualSpeed);
+      if (DEBUG) console.log("Wall collision! Speed:", actualSpeed, "Collider:", collisionInfo.colliderObject.name);
       
       setLastCollisionTime(currentTime);
       hasCollided.current = true;
       
-      // Get the collision normal (direction of the impact)
       const normal = collisionInfo.manifold.normal();
-      
-      // Create a normalized vector from the collision normal
       const normalVec = new THREE.Vector3(normal.x, normal.y, normal.z).normalize();
+      const kartRotationVal = kart.current.rotation.y - driftDirection.current * driftForce.current; // Get current kart rotation
+      const currentForwardDir = new THREE.Vector3(-Math.sin(kartRotationVal),0,-Math.cos(kartRotationVal));
+
+
+      // Simplified bounce: reflect velocity and reduce speed
+      const currentLinvel = body.current.linvel();
+      const reflectedVel = new THREE.Vector3(currentLinvel.x, currentLinvel.y, currentLinvel.z).reflect(normalVec);
       
-      // Get the forward direction of the kart
-      const kartRotation = kart.current.rotation.y - driftDirection.current * driftForce.current;
-      const forwardDirection = new THREE.Vector3(
-        -Math.sin(kartRotation),
-        0,
-        -Math.cos(kartRotation)
-      );
+      // Reduce speed significantly upon collision
+      const speedReductionFactor = 0.3; 
+      body.current.setLinvel({ 
+          x: reflectedVel.x * speedReductionFactor, 
+          y: reflectedVel.y * speedReductionFactor, // Allow some vertical bounce if desired
+          z: reflectedVel.z * speedReductionFactor 
+      }, true);
       
-      // Calculate the bounce-back force (opposing the direction of movement)
-      const bumpForce = 20 * characterStats.weightMultiplier;
+      setCurrentSpeed(currentSpeed * speedReductionFactor);
+      maxSpeedAfterCollision.current = maxSpeed * 0.2; 
+      setWallCollisionRecovery(2); // 2-second recovery period
       
-      // Calculate the dot product to determine how head-on the collision is
-      const dot = forwardDirection.dot(normalVec);
-      
-      // Apply bounce-back force based on the collision normal
-      body.current.applyImpulse(
-        {
-          x: normalVec.x * bumpForce,
-          y: 0, // No vertical bounce
-          z: normalVec.z * bumpForce,
-        },
-        true
-      );
-      
-      // Apply speed penalty
-      setCurrentSpeed(Math.max(currentSpeed * 0.3, 0)); // Reduce to 30% of current speed
-      maxSpeedAfterCollision.current = maxSpeed * 0.2; // Limit max speed to 20% during recovery
-      setWallCollisionRecovery(4); // 4-second recovery period
-      
-      // Play collision sound
       if (landingSound.current) {
-        if (landingSound.current.isPlaying) {
-          landingSound.current.stop();
-        }
+        if (landingSound.current.isPlaying) landingSound.current.stop();
         landingSound.current.play();
         landingSound.current.setVolume(1.0);
       }
       
-      // Reset collision state after a delay
       setTimeout(() => {
-        hasCollided.current = false;
+        if (body.current) hasCollided.current = false;
       }, 400);
     }
   };
@@ -773,36 +618,38 @@ export const PlayerController = ({
       <RigidBody
         ref={body}
         colliders={false}
-        position={[8, 60, -119]}
-        centerOfMass={[0, -1, 0]}
-        mass={3}
+        position={[8, 2, -119]} // Start on the ground
+        centerOfMass={[0, -0.5, 0]} // Lowered center of mass
+        mass={1 * characterStats.weightMultiplier} // Use actual weight multiplier
         ccd
-        name="player"
-        type={player.id === id ? "dynamic" : "kinematic"}
+        name={id} // Set RigidBody name to player's ID
+        type={"dynamic"} // Always dynamic for the controlled player
         onCollisionEnter={(collisionInfo) => {
-          // Ground detection
-          if (collisionInfo.target.translation().y < body.current.translation().y - 0.3) {
-            isOnFloor.current = true;
+          const otherColliderName = collisionInfo.colliderObject?.name;
+          if (DEBUG && otherColliderName !== "ground") console.log("Collision with:", otherColliderName);
+
+          // Ground detection more robustly
+          const contactNormal = collisionInfo.manifold.normal();
+          if (contactNormal.y > 0.5) { // If contact normal is mostly upward
             setIsOnGround(true);
+            if(jumpForce.current > 0 && landingSound.current && !landingSound.current.isPlaying) { // Landing sound
+                landingSound.current.play();
+            }
+            jumpForce.current = 0; // Reset jump force on landing
           } 
-          // Wall detection - consider any collision that's not at the bottom to be a wall
-          else {
-            if (DEBUG) console.log("Potential wall collision detected");
-            handleWallCollision(collisionInfo);
+          // Wall detection - consider any collision that's not primarily ground
+          else if (Math.abs(contactNormal.y) < 0.5) {
+             handleWallCollision(collisionInfo);
           }
         }}
         onCollisionExit={(collisionInfo) => {
-          // Only change ground state if we're exiting what we consider to be ground
-          if (collisionInfo.target.translation().y < body.current.translation().y - 0.3) {
-            isOnFloor.current = false;
-            setIsOnGround(false);
-          }
+            // Check if we are really leaving the ground
+            // This might need raycasting downwards to be truly robust
+            // For now, a simple exit means not on ground.
+            // setIsOnGround(false); 
         }}
       >
-        <BallCollider
-          args={[0.5]}
-          mass={3}
-        />
+        <BallCollider args={[0.5]} mass={1 * characterStats.weightMultiplier}/>
       </RigidBody>
 
       <group ref={kart} rotation={[0, Math.PI / 2, 0]}>
@@ -810,145 +657,54 @@ export const PlayerController = ({
           <Mario
             currentSpeed={currentSpeed}
             steeringAngleWheels={steeringAngleWheels}
-            isBoosting={isBoosting}
-            shouldLaunch={shouldLaunch}
+            isBoosting={isDriftBoosting || visualItemBoostActive} 
+            shouldLaunch={shouldLaunch} 
           />
-          <CoinParticles coins={coins} />
-          <ItemParticles item={item} />
+          <CoinParticles coins={useStore(state => state.coins)} /> {/* Directly use store coins */}
+          <ItemParticles item={item} /> 
+          {visualItemBoostActive && activeBoost === "mushroom" && <MushroomBoostParticles />}
+          {visualItemBoostActive && activeBoost === "upvoteBoost" && <UpvoteBoostParticles />}
+          
+          {/* Drift Particles */}
           <mesh position={[0.6, 0.05, 0.5]} scale={scale}>
             <sphereGeometry args={[0.05, 16, 16]} />
-            <meshStandardMaterial
-              emissive={fireColor}
-              toneMapped={false}
-              emissiveIntensity={100}
-              transparent
-              opacity={0.4}
-            />
+            <meshStandardMaterial emissive={fireColor} toneMapped={false} emissiveIntensity={100} transparent opacity={0.4}/>
           </mesh>
           <mesh position={[0.6, 0.05, 0.5]} scale={scale * 10}>
             <sphereGeometry args={[0.05, 16, 16]} />
-            <FakeGlowMaterial
-              falloff={3}
-              glowInternalRadius={1}
-              glowColor={fireColor}
-              glowSharpness={1}
-            />
+            <FakeGlowMaterial falloff={3} glowInternalRadius={1} glowColor={fireColor} glowSharpness={1}/>
           </mesh>
           <mesh position={[-0.6, 0.05, 0.5]} scale={scale}>
             <sphereGeometry args={[0.05, 16, 16]} />
-            <meshStandardMaterial
-              emissive={fireColor}
-              toneMapped={false}
-              emissiveIntensity={100}
-              transparent
-              opacity={0.4}
-            />
+            <meshStandardMaterial emissive={fireColor} toneMapped={false} emissiveIntensity={100} transparent opacity={0.4}/>
           </mesh>
           <mesh position={[-0.46, 0.05, 0.3]} ref={leftWheel}></mesh>
           <mesh position={[0.46, 0.05, 0.3]} ref={rightWheel}></mesh>
           <mesh position={[-0.6, 0.05, 0.5]} scale={scale * 10}>
             <sphereGeometry args={[0.05, 16, 16]} />
-            <FakeGlowMaterial
-              falloff={3}
-              glowInternalRadius={1}
-              glowColor={fireColor}
-              glowSharpness={1}
-            />
+            <FakeGlowMaterial falloff={3} glowInternalRadius={1} glowColor={fireColor} glowSharpness={1}/>
           </mesh>
-          {/* <FlameParticles isBoosting={isBoosting} /> */}
+          
           <DriftParticlesLeft fireColor={fireColor} scale={scale} />
           <DriftParticlesRight fireColor={fireColor} scale={scale} />
-          <SmokeParticles
-            driftRight={driftRight.current}
-            driftLeft={driftLeft.current}
-          />
-          <PointParticle
-            position={[-0.6, 0.05, 0.5]}
-            png="./particles/circle.png"
-            fireColor={fireColor}
-          />
-          <PointParticle
-            position={[0.6, 0.05, 0.5]}
-            png="./particles/circle.png"
-            fireColor={fireColor}
-          />
-          <PointParticle
-            position={[-0.6, 0.05, 0.5]}
-            png="./particles/star.png"
-            fireColor={fireColor}
-          />
-          <PointParticle
-            position={[0.6, 0.05, 0.5]}
-            png="./particles/star.png"
-            fireColor={fireColor}
-          />
+          <SmokeParticles driftRight={driftRight.current} driftLeft={driftLeft.current}/>
+          <PointParticle position={[-0.6, 0.05, 0.5]} png="./particles/circle.png" fireColor={fireColor}/>
+          <PointParticle position={[0.6, 0.05, 0.5]} png="./particles/circle.png" fireColor={fireColor}/>
+          <PointParticle position={[-0.6, 0.05, 0.5]} png="./particles/star.png" fireColor={fireColor}/>
+          <PointParticle position={[0.6, 0.05, 0.5]} png="./particles/star.png" fireColor={fireColor}/>
           <HitParticles shouldLaunch={shouldLaunch} />
         </group>
 
-        {/* <ContactShadows frames={1} /> */}
-        <PerspectiveCamera
-          makeDefault
-          position={[0, 2, 8]}
-          fov={50}
-          ref={cam}
-          far={5000}
-        />
-        <PositionalAudio
-          ref={engineSound}
-          url="./sounds/engine.wav"
-          autoplay
-          loop
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={driftSound}
-          url="./sounds/drifting.mp3"
-          loop
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={driftTwoSound}
-          url="./sounds/driftingTwo.mp3"
-          loop
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={driftOrangeSound}
-          url="./sounds/driftOrange.wav"
-          loop={false}
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={driftBlueSound}
-          url="./sounds/driftBlue.wav"
-          loop={false}
-          distance={1000}
-        />
-
-        <PositionalAudio
-          ref={driftPurpleSound}
-          url="./sounds/driftPurple.wav"
-          loop={false}
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={jumpSound}
-          url="./sounds/jump.mp3"
-          loop={false}
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={landingSound}
-          url="./sounds/landing.wav"
-          loop={false}
-          distance={1000}
-        />
-        <PositionalAudio
-          ref={turboSound}
-          url="./sounds/turbo.wav"
-          loop={false}
-          distance={1000}
-        />
+        <PerspectiveCamera makeDefault position={[0, 2, 8]} fov={50} ref={cam} far={5000}/>
+        <PositionalAudio ref={engineSound} url="./sounds/engine.wav" autoplay loop distance={1000}/>
+        <PositionalAudio ref={driftSound} url="./sounds/drifting.mp3" loop distance={1000}/>
+        <PositionalAudio ref={driftTwoSound} url="./sounds/driftingTwo.mp3" loop distance={1000}/>
+        <PositionalAudio ref={driftOrangeSound} url="./sounds/driftOrange.wav" loop={false} distance={1000}/>
+        <PositionalAudio ref={driftBlueSound} url="./sounds/driftBlue.wav" loop={false} distance={1000}/>
+        <PositionalAudio ref={driftPurpleSound} url="./sounds/driftPurple.wav" loop={false} distance={1000}/>
+        <PositionalAudio ref={jumpSound} url="./sounds/jump.mp3" loop={false} distance={1000}/>
+        <PositionalAudio ref={landingSound} url="./sounds/landing.wav" loop={false} distance={1000}/>
+        <PositionalAudio ref={turboSound} url="./sounds/turbo.wav" loop={false} distance={1000}/>
       </group>
     </group>
   ) : null;

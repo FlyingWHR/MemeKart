@@ -3,12 +3,16 @@
  */
 
 import React, { useMemo, useRef } from 'react'
-import { shaderMaterial } from '@react-three/drei'
+import { shaderMaterial, useTexture } from '@react-three/drei' // Import useTexture
 import { extend, useFrame } from '@react-three/fiber'
 import { Color, DoubleSide, AdditiveBlending } from 'three'
 
 export default function FakeFlame({ falloff = 3, glowInternalRadius = 1.0, glowColor = 'orange', glowSharpness = 1.0 , isBoosting,}) {
-  const FakeFlame = useMemo(() => {
+  
+  const flameTexture = useTexture('/particles/fire_01.png'); 
+  // Ensure this path is correct relative to the public directory
+
+  const FakeFlameMaterial = useMemo(() => { // Renamed to avoid conflict with component name
     return shaderMaterial(
       {
         falloffAmount: falloff,
@@ -17,6 +21,7 @@ export default function FakeFlame({ falloff = 3, glowInternalRadius = 1.0, glowC
         glowSharpness: glowSharpness,
         time: 0,
         isBoosting: isBoosting,
+        flameTex: flameTexture, // New uniform
       },
       /*GLSL */
       `
@@ -57,6 +62,7 @@ export default function FakeFlame({ falloff = 3, glowInternalRadius = 1.0, glowC
       uniform float glowInternalRadius;
       uniform float time;
       uniform bool isBoosting;
+      uniform sampler2D flameTex; // New sampler uniform
 
       varying vec2 vUv;
 
@@ -125,20 +131,24 @@ export default function FakeFlame({ falloff = 3, glowInternalRadius = 1.0, glowC
           col = 0.85*col.yxz;
         #endif
           
+        // Sample the texture
+        vec4 texColor = texture2D(flameTex, vUv);
 
-        if (isBoosting) {
-          gl_FragColor = vec4(col, 1.0);
-        } else {
-          gl_FragColor = vec4(col, 0.0);
-        }
+        float visibility = isBoosting ? 1.0 : 0.0;
+        vec3 finalColor = col * texColor.rgb; // Modulate procedural color with texture color
+        
+        // Using procedural alpha (c1) and texture alpha, controlled by visibility
+        float finalAlpha = c1 * texColor.a * visibility; 
+            
+        gl_FragColor = vec4(finalColor, finalAlpha);
 
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
     )
-  }, [falloff, glowInternalRadius, glowColor, glowSharpness, isBoosting])
+  }, [falloff, glowInternalRadius, glowColor, glowSharpness, isBoosting, flameTexture])
 
-  extend({ FakeFlame })
+  extend({ FakeFlameMaterial }) // Extend with the new material name
 
   useFrame((state, delta) => {
     ref.current.time += delta
@@ -147,8 +157,8 @@ export default function FakeFlame({ falloff = 3, glowInternalRadius = 1.0, glowC
   const ref = useRef()
 
   return (
-    <fakeFlame
-      key={FakeFlame.key}
+    <fakeFlameMaterial // Use the new material name
+      key={FakeFlameMaterial.key}
       side={DoubleSide}
       transparent={true}
       blending={AdditiveBlending}

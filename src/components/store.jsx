@@ -10,6 +10,10 @@ export const playAudio = (path, callback) => {
 export const items = [
   "banana",
   "shell",
+  "mushroom", 
+  "memeSticker",
+  "downvote", 
+  "trollTrap", // Added Troll Trap item
 ]
 
 export const useStore = create((set, get) => ({
@@ -21,11 +25,16 @@ export const useStore = create((set, get) => ({
   rightWheel: null,
   bodyRotation: null,
   pastPositions: [],
-  shouldSlowdown: false,
+  playerEffects: {}, // To store player-specific effects (slowdown, disorientation)
   bananas: [],
-  items: ["mushroom", "shell", "banana"],
+  items: ["mushroom", "shell", "banana", "memeSticker", "downvote", "trollTrap"], // Added trollTrap
   item: null,
   shells: [],
+  trollTraps: [], // Array to store active troll traps {id, position, rotation}
+  // State for Meme Sticker
+  isStickerActive: false,
+  stickerImage: null,
+  stickerEndTime: 0,
   skids: [],
   coins : 0,
   players : [],
@@ -93,11 +102,93 @@ export const useStore = create((set, get) => ({
     getBodyRotation: () => {
       return get().bodyRotation;
     },
-    setShouldSlowDown: (shouldSlowdown) => {
-      set({ shouldSlowdown });
+    // Refactored setShouldSlowDown and getShouldSlowDown to use playerEffects for the current player
+    setShouldSlowDown: (isSlowed) => { // Used by banana collision
+      const playerId = get().id;
+      if (!playerId) return;
+      if (isSlowed) {
+        get().actions.applySlowdown(playerId, 1500); // Banana slowdown duration 1.5s
+      } else {
+        get().actions.removeSlowdown(playerId);
+      }
     },
-    getShouldSlowDown: () => {
-      return get().shouldSlowdown;
+    getShouldSlowDown: () => { // Check for current player
+      const playerId = get().id;
+      if (!playerId) return false;
+      return get().playerEffects[playerId]?.isSlowed || false;
+    },
+    // New actions for Downvote item
+    applySlowdown: (targetPlayerId, duration) => {
+      set((state) => ({
+        playerEffects: {
+          ...state.playerEffects,
+          [targetPlayerId]: {
+            ...(state.playerEffects[targetPlayerId] || {}),
+            isSlowed: true,
+            slowEndTime: Date.now() + duration,
+          },
+        },
+      }));
+      playAudio("downvote_hit"); // Placeholder sound
+
+      setTimeout(() => {
+        get().actions.removeSlowdown(targetPlayerId);
+      }, duration);
+    },
+    removeSlowdown: (targetPlayerId) => {
+      set((state) => ({
+        playerEffects: {
+          ...state.playerEffects,
+          [targetPlayerId]: {
+            ...(state.playerEffects[targetPlayerId] || {}),
+            isSlowed: false,
+            slowEndTime: 0,
+          },
+        },
+      }));
+    },
+    // Troll Trap Actions
+    addTrollTrap: (trapData) => {
+      set((state) => ({
+        trollTraps: [...state.trollTraps, trapData],
+      }));
+    },
+    removeTrollTrapById: (trapId) => {
+      set((state) => ({
+        trollTraps: state.trollTraps.filter((trap) => trap.id !== trapId),
+      }));
+    },
+    // Disorientation Actions
+    applyDisorientation: (targetPlayerId, type = 'invertedControls', duration = 3000) => {
+      set((state) => ({
+        playerEffects: {
+          ...state.playerEffects,
+          [targetPlayerId]: {
+            ...(state.playerEffects[targetPlayerId] || {}),
+            isDisoriented: true,
+            disorientationType: type,
+            disorientationEndTime: Date.now() + duration,
+          },
+        },
+      }));
+      playAudio("trollolol"); // Placeholder sound for troll trap activation
+
+      setTimeout(() => {
+        get().actions.removeDisorientation(targetPlayerId);
+      }, duration);
+    },
+    removeDisorientation: (targetPlayerId) => {
+      set((state) => ({
+        playerEffects: {
+          ...state.playerEffects,
+          [targetPlayerId]: {
+            ...(state.playerEffects[targetPlayerId] || {}),
+            isDisoriented: false,
+            disorientationType: null,
+            disorientationEndTime: 0,
+          },
+        },
+      }));
     },
     addBanana: (banana) => {
       set((state) => ({
@@ -121,14 +212,54 @@ export const useStore = create((set, get) => ({
       set({ bananas });
     },
     setItem:() => {
-      set((state) => ({
-        item: state.items[Math.floor(Math.random() * state.items.length)],
-      }));
+      const availableItems = get().items; // Use get() to access current items array
+      set({ item: availableItems[Math.floor(Math.random() * availableItems.length)] });
+    },
+    // Action to apply meme sticker
+    applyMemeSticker: () => {
+      const memeImages = ["trollface.png", "doge_sticker.png", "pepe_sticker.png"]; // Assuming these files will exist
+      const randomMeme = memeImages[Math.floor(Math.random() * memeImages.length)];
+      const stickerDuration = 3000; // 3 seconds
+
+      set({
+        isStickerActive: true,
+        stickerImage: `/images/memes/${randomMeme}`,
+        stickerEndTime: Date.now() + stickerDuration,
+      });
+      playAudio("sticker_apply"); // Placeholder sound
+
+      // Schedule removal of sticker
+      setTimeout(() => {
+        get().actions.removeMemeSticker();
+      }, stickerDuration);
+    },
+    removeMemeSticker: () => {
+      set({ isStickerActive: false, stickerImage: null, stickerEndTime: 0 });
+      playAudio("sticker_remove"); // Placeholder sound
     },
     useItem:() => {
-      set((state) => ({
-        item: "",
-      }));
+      const currentItem = get().item;
+      const ownPlayerId = get().id; // Get current player's ID
+      if (!currentItem || !ownPlayerId) return;
+
+      if (currentItem === "memeSticker") {
+        get().actions.applyMemeSticker();
+      } else if (currentItem === "mushroom") {
+        console.log("Used mushroom (effect handled in PlayerController)");
+      } else if (currentItem === "downvote") {
+        get().actions.applySlowdown(ownPlayerId, 4000); 
+      } else if (currentItem === "trollTrap") {
+        // PlayerController will handle placement & then call setItem(null)
+        // For now, useItem doesn't consume it directly to allow placement phase.
+        // If PlayerController directly calls addTrollTrap and setItem(null), this branch is just for logging.
+        console.log("Troll Trap selected for placement.");
+      }
+      // Add other item logic here as they are implemented
+
+      // Consume the item (except for trollTrap which is consumed after placement in PlayerController)
+      if (currentItem !== "trollTrap") { 
+         set({ item: null });
+      }
     },
     addShell: (shell) => {
       set((state) => ({
@@ -166,7 +297,21 @@ export const useStore = create((set, get) => ({
       }));
     },
     setId : (id) => {
-      set({id});
+      set((state) => ({
+        id,
+        // Initialize playerEffects for the current player when ID is set
+        playerEffects: {
+          ...state.playerEffects,
+          [id]: {
+            isSlowed: false,
+            slowEndTime: 0,
+            isDisoriented: false,
+            disorientationType: null,
+            disorientationEndTime: 0,
+            // Add other potential effects with default values here
+          },
+        },
+      }));
     },
     setGameStarted: (gameStarted) => {
       set({ gameStarted });
