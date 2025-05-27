@@ -2,6 +2,8 @@ import { Euler, Object3D, Vector3, Matrix4, DoubleSide } from 'three'
 import { useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { vec3 } from '@react-three/rapier'
+import { useTexture } from '@react-three/drei'; // Import useTexture
+import { useTexture } from '@react-three/drei'; // Import useTexture
 
 
 import  { useStore } from './store'
@@ -17,6 +19,8 @@ const v = new Vector3()
 export function Skid({ count = 50000, opacity = 0.5, size = 0.3 }) {
   const ref = useRef(null);
   const { leftWheel, rightWheel } = useStore();
+  const skidTexture = useTexture('/images/skidmark.png'); // Load the texture
+  const skidTexture = useTexture('/images/skidmark.png'); // Load the texture
   let index = 0
   useFrame(() => {
     if(!leftWheel && !rightWheel) return;
@@ -41,13 +45,20 @@ export function Skid({ count = 50000, opacity = 0.5, size = 0.3 }) {
   return (
     <instancedMesh frustumCulled={false} ref={ref} args={[undefined, undefined, count]}>
       <planeGeometry args={[size, size]} />
-      <meshBasicMaterial color="black" side={DoubleSide} transparent opacity={opacity} />
+      <meshBasicMaterial 
+        map={skidTexture} 
+        side={DoubleSide} 
+        transparent 
+        opacity={opacity} 
+        alphaTest={0.1} // Add alphaTest
+      />
     </instancedMesh>
   )
 }
 
 function setItemAt(instances, rotation, body, index) {
   o.position.copy(body.getWorldPosition(v));
+  o.position.y += 0.015; // Small offset to prevent Z-fighting
   o.rotation.set(0, rotation, 0);
   o.scale.setScalar(1)
   o.updateMatrix()

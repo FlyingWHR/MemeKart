@@ -241,25 +241,52 @@ export const PlayerController = ({
     // --- Visual Cues (shouldLaunch, wheelSpinning) ---
     const globalShouldSlow = actions.getShouldSlowDown(); // For banana
     let launchNow = false;
-    let spinWheelsNow = false;
+    let spinWheelsNow = false; // This will determine if skid marks are generated
 
-    if (globalShouldSlow) { // Banana is dominant
+    if (globalShouldSlow) { // Banana effect - implies loss of control, skids likely
         launchNow = true;
-        spinWheelsNow = true;
-    } else { // Check item effects if no banana
-        if (isPlayerDownvoted) {
-            launchNow = true;
-            spinWheelsNow = true;
-        } else if (isItemBoosting) {
-            launchNow = true; // Boosts might have flame particles
-            // spinWheelsNow remains false for boosts
+        spinWheelsNow = true; 
+    } else if (isPlayerDownvoted) { // Downvote effect
+        launchNow = true; // Show some effect like smoke
+        // For downvote, only spin wheels if also turning sharply, similar to hard turn logic.
+        // This prevents skid marks when slowing down in a straight line.
+        if (Math.abs(steeringAngle) > MaxSteeringSpeed * 0.6 && currentSpeed > 10) {
+             spinWheelsNow = true;
         }
-    }
-    if (shouldLaunch !== launchNow) setShouldLaunch(launchNow);
-    if (rightWheel.current && !driftLeft.current && !driftRight.current) { // Don't override drift visuals
-        if (rightWheel.current.isSpinning !== spinWheelsNow) rightWheel.current.isSpinning = spinWheelsNow;
+    } else if (isItemBoosting) { // Item boosts
+        launchNow = true; // For flame particles, etc.
+        // Item boosts typically don't cause skids unless also turning/drifting.
     }
     
+    // Drifting always causes skid marks
+    if (driftLeft.current || driftRight.current) {
+        if (isOnGround) { // Only leave marks if on ground
+            spinWheelsNow = true;
+            // launchNow = true; // Drifting already has its own particle effects (fireColor, scale)
+        }
+    }
+    // Hard turns (non-drifting)
+    else if (!driftLeft.current && !driftRight.current && Math.abs(steeringAngle) > MaxSteeringSpeed * 0.7 && currentSpeed > 15 && isOnFloor.current) {
+        spinWheelsNow = true;
+        // launchNow = true; // Optionally add smoke for hard turns too
+    }
+
+
+    if (shouldLaunch !== launchNow) setShouldLaunch(launchNow);
+    
+    // Update wheel spinning state for Skid.jsx
+    if (leftWheel.current && leftWheel.current.isSpinning !== spinWheelsNow && !driftRight.current) { // Avoid conflicting with drift-specific logic if any
+        leftWheel.current.isSpinning = spinWheelsNow;
+    }
+    if (rightWheel.current && rightWheel.current.isSpinning !== spinWheelsNow && !driftLeft.current) {
+        rightWheel.current.isSpinning = spinWheelsNow;
+    }
+    // Ensure wheels stop spinning if no condition is met (and not drifting)
+    if (!spinWheelsNow && !driftLeft.current && !driftRight.current) {
+        if (leftWheel.current && leftWheel.current.isSpinning) leftWheel.current.isSpinning = false;
+        if (rightWheel.current && rightWheel.current.isSpinning) rightWheel.current.isSpinning = false;
+    }
+
     // --- Steering Logic ---
     // Uses actualLeftPressed, actualRightPressed, actualPointerX which may be inverted by disorientation
     if (actualLeftPressed && currentSpeed > 0) {

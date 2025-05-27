@@ -35,6 +35,10 @@ export const useStore = create((set, get) => ({
   isStickerActive: false,
   stickerImage: null,
   stickerEndTime: 0,
+  // State for Item Boosting (e.g., Mushroom, UpvoteBoost)
+  isItemBoosting: false, 
+  activeBoost: null, // This was already present, used by PlayerController to calculate speed
+  boostEndTime: 0,   // This was already present
   skids: [],
   coins : 0,
   players : [],
@@ -190,6 +194,26 @@ export const useStore = create((set, get) => ({
         },
       }));
     },
+    // Boost Item Actions (Mushroom, UpvoteBoost)
+    applyBoost: (boostType) => {
+      const duration = boostType === "mushroom" ? 3000 : 3500; // 3s for mushroom, 3.5s for upvote
+      set({ 
+        activeBoost: boostType, 
+        boostEndTime: Date.now() + duration,
+        isItemBoosting: true // Set item boosting flag
+      });
+      playAudio(boostType === "mushroom" ? "mushroom_boost" : "upvote_boost_effect"); // Placeholder sounds
+
+      console.log("Applying item boost:", boostType);
+
+      setTimeout(() => {
+        get().actions.removeBoost();
+      }, duration);
+    },
+    removeBoost: () => {
+      set({ activeBoost: null, boostEndTime: 0, isItemBoosting: false }); // Clear item boosting flag
+      console.log("Item boost removed");
+    },
     addBanana: (banana) => {
       set((state) => ({
         bananas: [...state.bananas, banana],
@@ -244,8 +268,8 @@ export const useStore = create((set, get) => ({
 
       if (currentItem === "memeSticker") {
         get().actions.applyMemeSticker();
-      } else if (currentItem === "mushroom") {
-        console.log("Used mushroom (effect handled in PlayerController)");
+      } else if (currentItem === "mushroom" || currentItem === "upvoteBoost") { // Added upvoteBoost
+        get().actions.applyBoost(currentItem); // Call the new applyBoost action
       } else if (currentItem === "downvote") {
         get().actions.applySlowdown(ownPlayerId, 4000); 
       } else if (currentItem === "trollTrap") {
@@ -308,6 +332,7 @@ export const useStore = create((set, get) => ({
             isDisoriented: false,
             disorientationType: null,
             disorientationEndTime: 0,
+            isItemBoosting: false, // Ensure isItemBoosting is initialized for player effects if needed (though global is primary)
             // Add other potential effects with default values here
           },
         },

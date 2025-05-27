@@ -10,7 +10,8 @@ import { CustomLoader } from './components/CustomLoader'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ErrorTracker } from './components/ErrorTracker'
 import { MemeStickerHUD } from './components/MemeStickerHUD'; 
-import { DownvoteEffectHUD } from './components/DownvoteEffectHUD'; // Import DownvoteEffectHUD
+import { DownvoteEffectHUD } from './components/DownvoteEffectHUD'; 
+import { WindscreenBoostEffect } from './components/WindscreenBoostEffect'; // Import WindscreenBoostEffect
 
 export const Controls = {
   up: 'up',
@@ -137,13 +138,14 @@ function App() {
                 </group>
               )}>
                 <Experience />
+                <WindscreenBoostEffect /> {/* Add the effect here, inside Suspense if it loads assets */}
               </ErrorBoundary>
             </KeyboardControls>
           </Physics>
         </Suspense>
       </Canvas>
       <MemeStickerHUD /> 
-      <DownvoteEffectHUD /> {/* Render DownvoteEffectHUD */}
+      <DownvoteEffectHUD /> 
     </ErrorTracker>
   )
 }
